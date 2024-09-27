@@ -64,7 +64,7 @@ while i < total:
             batch = {}
             batch[i] = original_subtitle[i].content
 
-            print(f"Traduziu {i}/{total}")
+            print(f"Translated {i}/{total}")
 
             i += 1
         except Exception as e:
