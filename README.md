@@ -11,7 +11,7 @@ This project provides tools to interact with the Google Generative AI API to tra
    cd gemini-subtitle-translator
    ```
 
-2. **Create and activate a virtual environment**:
+2. **Create and activate a virtual environment (Optional)**:
 
    ```sh
    # On Windows:
