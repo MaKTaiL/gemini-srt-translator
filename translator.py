@@ -11,6 +11,7 @@ target_language = config.target_language
 origin_file = config.origin_file
 translated_file = config.translated_file
 model_name = config.model_name
+batch_size = config.batch_size
 
 genai.configure(api_key=gemini_key)
 
@@ -44,7 +45,7 @@ total = len(original_subtitle)
 batch = {}
 
 while i < total:
-    if len(batch) < 30:
+    if len(batch) < batch_size:
         batch[str(i)] = original_subtitle[i].content
         i += 1
         continue

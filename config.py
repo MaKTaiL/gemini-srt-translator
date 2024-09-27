@@ -13,3 +13,6 @@ translated_file = "Translated File.srt"
 
 # AI Model configuration
 model_name = "gemini-1.5-flash-latest"
+
+# Number of lines to translate per batch
+batch_size = 30

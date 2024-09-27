@@ -71,6 +71,12 @@ Configure the necessary variables in `config.py` located in the project director
   model_name = "gemini-1.5-flash-latest"
   ```
 
+- **`batch_size`**: The number of lines to process in each batch.
+
+  ```python
+  batch_size = 30
+  ```
+
 ## Usage
 
 1. **List Available Models**:
