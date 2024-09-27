@@ -1,6 +1,6 @@
-# Translator Project
+# Gemini Subtitle Translator
 
-This project provides tools to interact with Google Generative AI for listing available models and translating subtitle files.
+This project provides tools to interact with the Google Generative AI API to translate subtitles from one language to another.
 
 ## Setup
 
