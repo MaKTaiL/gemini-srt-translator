@@ -7,11 +7,13 @@ This project provides tools to interact with the Google Generative AI API to tra
 1. **Create and activate a virtual environment**:
 
    ```sh
-   python3.12 -m venv venv
    # On Windows:
+
    python -m venv venv
    venv\Scripts\activate.bat
+
    # On Unix or MacOS:
+
    python3.12 -m venv venv
    source venv/bin/activate
    ```
