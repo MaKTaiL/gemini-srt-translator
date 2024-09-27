@@ -4,7 +4,14 @@ This project provides tools to interact with the Google Generative AI API to tra
 
 ## Setup
 
-1. **Create and activate a virtual environment**:
+1. **Clone the repository**:
+
+   ```sh
+   git clone https://github.com/maktail/gemini-subtitle-translator.git
+   cd gemini-subtitle-translator
+   ```
+
+2. **Create and activate a virtual environment**:
 
    ```sh
    # On Windows:
@@ -18,7 +25,7 @@ This project provides tools to interact with the Google Generative AI API to tra
    source venv/bin/activate
    ```
 
-2. **Install dependencies**:
+3. **Install dependencies**:
 
    ```sh
    pip install -r requirements.txt
