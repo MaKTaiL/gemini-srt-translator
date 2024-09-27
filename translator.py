@@ -3,22 +3,14 @@ import json
 import time
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
+import config
 
-################################
-# Add your own values here
-################################
-
-origin_language = "English"
-target_language = "Brazilian Portuguese"
-
-origin_file = "Original File.srt"
-translated_file = "Translated File.srt"
-
-gemini_key = ""
-model_name = "gemini-1.5-flash-latest"
-
-################################
-################################
+gemini_key = config.gemini_key
+origin_language = config.origin_language
+target_language = config.target_language
+origin_file = config.origin_file
+translated_file = config.translated_file
+model_name = config.model_name
 
 genai.configure(api_key=gemini_key)
 

@@ -26,7 +26,7 @@ This project provides tools to interact with the Google Generative AI API to tra
 
 ## Configuration
 
-Configure the necessary variables in `translator.py` located in the project directory:
+Configure the necessary variables in `config.py` located in the project directory:
 
 - **`gemini_key`**: Your Google Generative AI API key.
 

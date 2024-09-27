@@ -1,6 +1,7 @@
 import google.generativeai as genai
+import config
 
-gemini_key = ""
+gemini_key = config.gemini_key
 
 genai.configure(api_key=gemini_key)
 
