@@ -44,6 +44,7 @@ i = 0
 total = len(original_subtitle)
 batch = {}
 
+print(f"Starting translation of {total} lines...")
 while i < total:
     if len(batch) < batch_size:
         batch[str(i)] = original_subtitle[i].content
