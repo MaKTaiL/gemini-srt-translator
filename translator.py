@@ -16,8 +16,7 @@ batch_size = config.batch_size
 genai.configure(api_key=gemini_key)
 
 instruction = f"""You are an assistant that translates movies/series subtitles from {origin_language} to {target_language}.
-Return a json in the same format you received, but with the dialogues translated. Do not remove any tags, if present.
-Do not move dialogues or change the numbering of the indices. The number of dialogues must be the same as you received."""
+User will send a json and you must return a copy of it with the dialogues translated. Do not change the numbering of the indices."""
 
 model = genai.GenerativeModel(
     model_name=model_name,
@@ -55,15 +54,19 @@ while i < total:
             response = chat.send_message(json.dumps(batch))
             try:
                 translated_lines = json.loads(response.text)
+                if len(translated_lines) != len(batch):
+                    raise Exception("Gemini has returned a different number of lines than the original, trying again...")
+                for x in translated_lines:
+                    if x not in batch:
+                        raise Exception("Gemini has returned different indices than the original, trying again...")
             except Exception as e:
-                print(i)
                 print(e)
-                print(response.text)
+                chat.rewind()
                 continue
             for x in translated_lines:
                 translated_subtitle[int(x)].content = translated_lines[x]
             batch = {}
-            batch[i] = original_subtitle[i].content
+            batch[str(i)] = original_subtitle[i].content
 
             print(f"Translated {i}/{total}")
 
@@ -87,10 +90,15 @@ while len(batch) > 0:
         response = chat.send_message(json.dumps(batch))
         try:
             translated_lines = json.loads(response.text)
+            if len(translated_lines) != len(batch):
+                raise Exception("Gemini has returned a different number of lines than the original, trying again...")
+            for x in translated_lines:
+                if x not in batch:
+                    raise Exception("Gemini has returned different indices than the original, trying again...")
         except Exception as e:
-            print(i)
             print(e)
-            print(response.text)
+            chat.rewind()
+            continue
         for x in translated_lines:
             translated_subtitle[int(x)].content = translated_lines[x]
         batch = {}
