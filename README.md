@@ -41,12 +41,6 @@ Configure the necessary variables in `config.py` located in the project director
   gemini_key = "YOUR_GOOGLE_GENERATIVE_AI_API_KEY"
   ```
 
-- **`origin_language`**: The language of the original subtitles.
-
-  ```python
-  origin_language = "English"
-  ```
-
 - **`target_language`**: The language to translate the subtitles into.
 
   ```python
