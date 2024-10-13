@@ -4,7 +4,6 @@
 gemini_key = "YOUR_GOOGLE_GENERATIVE_AI_API_KEY"
 
 # Language settings
-origin_language = "English"
 target_language = "Brazilian Portuguese"
 
 # File paths

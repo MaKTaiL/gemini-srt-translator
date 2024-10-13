@@ -15,7 +15,7 @@ batch_size = config.batch_size
 
 genai.configure(api_key=gemini_key)
 
-instruction = f"""You are an assistant that translates movies/series subtitles from {origin_language} to {target_language}.
+instruction = f"""You are an assistant that translates movies/series subtitles to {target_language}.
 User will send a json and you must return a copy of it with the dialogues translated. Do not change the numbering of the indices."""
 
 model = genai.GenerativeModel(
