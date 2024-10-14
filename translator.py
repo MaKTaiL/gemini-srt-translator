@@ -6,7 +6,6 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import config
 
 gemini_key = config.gemini_key
-origin_language = config.origin_language
 target_language = config.target_language
 origin_file = config.origin_file
 translated_file = config.translated_file
