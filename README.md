@@ -21,6 +21,19 @@ To install Gemini SRT Translator, use pip:
 pip install gemini-srt-translator
 ```
 
+## Setup
+
+### Generating Your API Key
+
+To use Gemini SRT Translator, you need to generate a free API key from Google AI Studio. Follow these steps:
+
+1. Go to [Google AI Studio API Key](https://aistudio.google.com/apikey).
+2. Sign in with your Google account.
+3. Click on "Generate API Key".
+4. Copy the generated API key and keep it secure.
+
+You will use this API key for setting up the script before starting the translation process.
+
 ## Usage
 
 ### Translate Subtitles
