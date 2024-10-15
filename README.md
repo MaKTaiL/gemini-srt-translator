@@ -1,90 +1,77 @@
-# Gemini Subtitle Translator
+# Gemini SRT Translator
 
-This project provides tools to interact with the Google Generative AI API to translate subtitles from one language to another.
+## Overview
 
-## Setup
+Gemini SRT Translator is a tool designed to translate subtitle files using Google Generative AI. It leverages the power of the Gemini API to provide accurate and efficient translations for your subtitle files.
 
-1. **Clone the repository**:
+## Features
 
-   ```sh
-   git clone https://github.com/maktail/gemini-subtitle-translator.git
-   cd gemini-subtitle-translator
-   ```
+- Translate subtitle files to a specified target language.
+- Customize translation settings such as model name and batch size.
+- List available models from the Gemini API.
 
-2. **Create and activate a virtual environment (Optional)**:
+## Installation
 
-   ```sh
-   # On Windows:
+To install Gemini SRT Translator, use pip:
 
-   python -m venv venv
-   venv\Scripts\activate.bat
-
-   # On Unix or MacOS:
-
-   python3.12 -m venv venv
-   source venv/bin/activate
-   ```
-
-3. **Install dependencies**:
-
-   ```sh
-   pip install -r requirements.txt
-   ```
-
-## Configuration
-
-Configure the necessary variables in `config.py` located in the project directory:
-
-- **`gemini_key`**: Your Google Generative AI API key.
-
-  ```python
-  gemini_key = "YOUR_GOOGLE_GENERATIVE_AI_API_KEY"
-  ```
-
-- **`target_language`**: The language to translate the subtitles into.
-
-  ```python
-  target_language = "Brazilian Portuguese"
-  ```
-
-- **`origin_file`**: The path to the original subtitle file.
-
-  ```python
-  origin_file = "Original File.srt"
-  ```
-
-- **`translated_file`**: The path where the translated subtitle file will be saved.
-
-  ```python
-  translated_file = "Translated File.srt"
-  ```
-
-- **`model_name`**: The name of the Google Generative AI model to use.
-
-  ```python
-  model_name = "gemini-1.5-flash-latest"
-  ```
-
-- **`batch_size`**: The number of lines to process in each batch.
-
-  ```python
-  batch_size = 30
-  ```
+```sh
+pip install gemini-srt-translator
+```
 
 ## Usage
 
-1. **List Available Models**:
+### Translate Subtitles
 
-   Run `listmodels.py` to list available Google Generative AI models.
+You can translate subtitles using the `translate` command:
 
-   ```sh
-   python listmodels.py
-   ```
+```python
+import gemini_srt_translator as gst
 
-2. **Translate Subtitles**:
+gst.gemini_api_key = "your_gemini_api_key_here"
+gst.target_language = "French"
+gst.subtitle_file = "subtitle.srt"
 
-   Run `translator.py` to translate the subtitle file.
+gst.translate()
+```
 
-   ```sh
-   python translator.py
-   ```
+This will translate the subtitles in the `subtitle.srt` file to French.
+
+## Configuration
+
+You can further customize the translation settings by providing optional parameters:
+
+- `translated_subtitle_file`: Path to save the translated subtitle file.
+- `model_name`: Model name to use for translation.
+- `batch_size`: Batch size for translation.
+
+Example:
+
+```python
+import gemini_srt_translator as gst
+
+gst.gemini_api_key = "your_gemini_api_key_here"
+gst.target_language = "French"
+gst.subtitle_file = "subtitle.srt"
+gst.translated_subtitle_file = "translated_subtitle.srt"
+gst.model_name = "gemini-1.5-flash"
+gst.batch_size = 30
+
+gst.translate()
+```
+
+### List Models
+
+You can list the available models using the `listmodels` command:
+
+```python
+import gemini_srt_translator as gst
+
+gst.gemini_api_key = "your_gemini_api_key_here"
+gst.listmodels()
+```
+
+This will print a list of available models to the console.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
