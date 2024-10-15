@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="gemini-srt-translator",
-    version="1.1.0",
+    version="1.1.2",
     packages=find_packages(),
     install_requires=[
         "google-generativeai==0.8.3",
@@ -14,9 +14,17 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/maktail/gemini-srt-translator",
     classifiers=[
-        "Programming Language :: Python :: 3",
+        "Development Status :: 5 - Production/Stable",
+        "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "Operating System :: OS Independent",
+        "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        "Topic :: Text Processing :: Linguistic",
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.9',
 )

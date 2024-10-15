@@ -7,15 +7,15 @@ import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 class GeminiSRTTranslator:
-    def __init__(self, gemini_api_key: str = None, target_language: str = None, subtitle_file: str = None, translated_subtitle_file: str = None, model_name: str = "gemini-1.5-flash", batch_size: int = 30):
+    def __init__(self, gemini_api_key: str = None, target_language: str = None, input_file: str = None, output_file: str = None, model_name: str = "gemini-1.5-flash", batch_size: int = 30):
         self.gemini_api_key = gemini_api_key
         self.target_language = target_language
-        self.subtitle_file = subtitle_file
-        self.translated_subtitle_file = translated_subtitle_file or ".".join(subtitle_file.split(".")[:-1]) + "_translated.srt"
+        self.input_file = input_file
+        self.output_file = output_file
         self.model_name = model_name
         self.batch_size = batch_size
 
-    def list_models(self):
+    def listmodels(self):
         """
         Lists available models from the Gemini API.
         """
@@ -25,7 +25,8 @@ class GeminiSRTTranslator:
         genai.configure(api_key=self.gemini_api_key)
         models = genai.list_models()
         for model in models:
-            print(model)
+            if "generateContent" in model.supported_generation_methods:
+                print(model.name.replace("models/", ""))
 
     def translate(self):
         """
@@ -37,9 +38,12 @@ class GeminiSRTTranslator:
         if not self.target_language:
             raise Exception("Please provide a target language.")
         
-        if not self.subtitle_file:
+        if not self.input_file:
             raise Exception("Please provide a subtitle file.")
         
+        if not self.output_file:
+            self.output_file = ".".join(self.input_file.split(".")[:-1]) + "_translated.srt"
+
         genai.configure(api_key=self.gemini_api_key)
 
         instruction = f"""You are an assistant that translates movies/series subtitles to {self.target_language}.
@@ -57,7 +61,7 @@ class GeminiSRTTranslator:
             generation_config={"response_mime_type": "application/json"},
         )
 
-        with open(self.subtitle_file, "r", encoding="utf-8") as original_file, open(self.translated_subtitle_file, "w", encoding="utf-8") as translated_file:
+        with open(self.input_file, "r", encoding="utf-8") as original_file, open(self.output_file, "w", encoding="utf-8") as translated_file:
             original_text = original_file.read()
 
             original_subtitle = list(srt.parse(original_text))

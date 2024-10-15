@@ -11,7 +11,7 @@
 
     gst.gemini_api_key = "your_gemini_api_key_here"
     gst.target_language = "French"
-    gst.subtitle_file = "subtitle.srt"
+    gst.input_file = "subtitle.srt"
 
     gst.translate()
     ```
@@ -33,8 +33,8 @@ from .main import GeminiSRTTranslator
 
 gemini_api_key: str = None
 target_language: str = None
-subtitle_file: str = None
-translated_subtitle_file: str = None
+input_file: str = None
+output_file: str = None
 model_name: str = None
 batch_size: int = None
 
@@ -58,7 +58,7 @@ def listmodels():
         Exception: If the Gemini API key is not provided.
     """
     translator = GeminiSRTTranslator(gemini_api_key)
-    translator.list_models()
+    translator.listmodels()
 
 def translate():
     """
@@ -78,10 +78,10 @@ def translate():
     gst.target_language = "French"
 
     # Path to the subtitle file to translate
-    gst.subtitle_file = "subtitle.srt"
+    gst.input_file = "subtitle.srt"
 
     # (Optional) Path to save the translated subtitle file
-    gst.translated_subtitle_file = "translated_subtitle.srt"
+    gst.output_file = "translated_subtitle.srt"
 
     # (Optional) Model name to use for translation
     gst.model_name = "gemini-1.5-flash"
@@ -99,8 +99,8 @@ def translate():
     params = {
         'gemini_api_key': gemini_api_key,
         'target_language': target_language,
-        'subtitle_file': subtitle_file,
-        'translated_subtitle_file': translated_subtitle_file,
+        'input_file': input_file,
+        'output_file': output_file,
         'model_name': model_name,
         'batch_size': batch_size
     }
