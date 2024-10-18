@@ -47,7 +47,7 @@ class GeminiSRTTranslator:
         genai.configure(api_key=self.gemini_api_key)
 
         instruction = f"""You are an assistant that translates movies/series subtitles to {self.target_language}.
-        User will send a json and you must return a copy of it with the dialogues translated. Do not change the numbering of the indices."""
+        User will send a json and you must return a copy of it with the dialogues translated. Return the same indices as the input."""
 
         model = genai.GenerativeModel(
             model_name=self.model_name,
