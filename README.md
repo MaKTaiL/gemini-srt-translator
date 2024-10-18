@@ -1,7 +1,8 @@
 # Gemini SRT Translator
 
-[![PyPI version](https://badge.fury.io/py/gemini-srt-translator.svg)](https://badge.fury.io/py/gemini-srt-translator)
+[![PyPI version](https://img.shields.io/pypi/v/gemini-srt-translator)](https://pypi.org/project/gemini-srt-translator)
 ![Python support](https://img.shields.io/pypi/pyversions/gemini-srt-translator)
+![Downloads](https://img.shields.io/pypi/dw/gemini-srt-translator)
 
 ## Overview
 
