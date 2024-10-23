@@ -1,5 +1,3 @@
-# gemini_srt_translator.py
-
 import srt
 import json
 import time
@@ -15,39 +13,17 @@ class GeminiSRTTranslator:
         self.model_name = model_name
         self.batch_size = batch_size
 
-    def listmodels(self):
-        """
-        Lists available models from the Gemini API.
-        """
-        if not self.gemini_api_key:
-            raise Exception("Please provide a valid Gemini API key.")
-
-        genai.configure(api_key=self.gemini_api_key)
-        models = genai.list_models()
-        for model in models:
-            if "generateContent" in model.supported_generation_methods:
-                print(model.name.replace("models/", ""))
-
     def translate(self):
         """
         Translates a subtitle file using the Gemini API.
         """
-        if not self.gemini_api_key:
-            raise Exception("Please provide a valid Gemini API key.")
-        
-        if not self.target_language:
-            raise Exception("Please provide a target language.")
-        
-        if not self.input_file:
-            raise Exception("Please provide a subtitle file.")
+        if not all([self.gemini_api_key, self.target_language, self.input_file]):
+            raise Exception("Missing required parameters. Please check api_key, target_language and input_file.")
         
         if not self.output_file:
             self.output_file = ".".join(self.input_file.split(".")[:-1]) + "_translated.srt"
 
         genai.configure(api_key=self.gemini_api_key)
-
-        instruction = f"""You are an assistant that translates subtitles to {self.target_language}.
-        You will receive a json and you must return a copy of it with the dialogues translated. Return the same indices as the input."""
 
         model = genai.GenerativeModel(
             model_name=self.model_name,
@@ -57,63 +33,137 @@ class GeminiSRTTranslator:
                 HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
                 HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
             },
-            system_instruction=instruction,
-            generation_config={"response_mime_type": "application/json", "temperature": 0},
+            generation_config={"temperature": 0}
         )
 
         with open(self.input_file, "r", encoding="utf-8") as original_file, open(self.output_file, "w", encoding="utf-8") as translated_file:
             original_text = original_file.read()
-
             original_subtitle = list(srt.parse(original_text))
             translated_subtitle = original_subtitle.copy()
-
-            i = 0
-            total = len(original_subtitle)
-            batch = {}
-
-            print(f"Starting translation of {total} lines...")
-
-            while i < total:
-                if len(batch) < self.batch_size:
-                    batch[str(i)] = original_subtitle[i].content
-                    i += 1
-                    continue
-                else:
-                    self._process_batch(model, batch, translated_subtitle)
-                    print(f"Translated {i}/{total}")
-
-            while len(batch) > 0:
-                self._process_batch(model, batch, translated_subtitle)
-                print(f"Translated {i}/{total}")
-
+            
+            # Ana çeviri döngüsü
+            self._translate_all(model, original_subtitle, translated_subtitle)
+            
             translated_file.write(srt.compose(translated_subtitle))
 
-    def _process_batch(self, model, batch, translated_subtitle):
+    def _translate_all(self, model, original_subtitle, translated_subtitle):
         """
-        Processes a batch of subtitles.
+        Tüm altyazıları çevirir ve sorunları otomatik çözer.
         """
-        try:
-            response = model.generate_content(json.dumps(batch))
+        total = len(original_subtitle)
+        current_index = 0
+        untranslated = {}  # çevrilmemiş altyazıları takip et
+        
+        print(f"Starting translation of {total} lines...")
+        
+        while current_index < total:
+            batch = {}
+            
+            # Batch'i doldur
+            while len(batch) < self.batch_size and current_index < total:
+                batch[str(current_index)] = original_subtitle[current_index].content
+                current_index += 1
+
+            if not batch:
+                continue
+
+            # Çeviri dene
+            translated_batch = self._translate_batch(model, batch)
+            
+            # Eksik çevirileri kontrol et
+            missing = set(batch.keys()) - set(translated_batch.keys())
+            
+            # Başarılı çevirileri kaydet
+            for idx, text in translated_batch.items():
+                translated_subtitle[int(idx)].content = text
+            
+            # Eksik çevirileri tekil olarak dene
+            if missing:
+                for idx in missing:
+                    single_result = self._translate_single(model, original_subtitle[int(idx)].content, idx)
+                    if single_result:  # Başarılı çeviri
+                        translated_subtitle[int(idx)].content = single_result
+                    else:  # Başarısız çeviri, daha sonra tekrar dene
+                        untranslated[idx] = original_subtitle[int(idx)].content
+            
+            # İlerlemeyi göster
+            print(f"Translated {min(current_index, total)}/{total}")
+
+        # Çevrilemeyen altyazıları farklı bir yaklaşımla tekrar dene
+        if untranslated:
+            print(f"\nRetrying {len(untranslated)} failed translations with alternative method...")
+            for idx, content in untranslated.items():
+                result = self._translate_with_alternative(model, content)
+                if result:
+                    translated_subtitle[int(idx)].content = result
+                    print(f"Successfully translated line {idx} with alternative method")
+
+    def _translate_batch(self, model, batch):
+        """
+        Bir batch'i çevirmeyi dener.
+        """
+        prompt = f"""
+TASK: Translate these subtitles to {self.target_language}
+INPUT: {json.dumps(batch, ensure_ascii=False)}
+IMPORTANT: Return ONLY a JSON object containing all translations with their original indices.
+"""
+        max_attempts = 3
+        current_attempt = 0
+        
+        while current_attempt < max_attempts:
             try:
-                translated_lines = json.loads(response.text)
-                if len(translated_lines) != len(batch):
-                    raise Exception("Gemini has returned a different number of lines than the original, trying again...")
-                for x in translated_lines:
-                    if x not in batch:
-                        raise Exception("Gemini has returned different indices than the original, trying again...")
+                response = model.generate_content(prompt)
+                response_text = response.text.strip()
+                
+                # JSON yanıtı temizle
+                if "```json" in response_text:
+                    response_text = response_text.split("```json")[1].split("```")[0].strip()
+                elif "```" in response_text:
+                    response_text = response_text.split("```")[1].strip()
+                
+                result = json.loads(response_text)
+                return result
+
             except Exception as e:
-                print(e)
-                return
-            for x in translated_lines:
-                translated_subtitle[int(x)].content = translated_lines[x]
-            batch.clear()
+                if "quota" in str(e).lower():
+                    print("Quota exceeded, waiting 1 minute...")
+                    time.sleep(60)
+                current_attempt += 1
+                if current_attempt == max_attempts:
+                    return {}  # Boş sözlük döndür, eksik çeviriler tekil olarak denenecek
+        
+        return {}
+
+    def _translate_single(self, model, text, idx):
+        """
+        Tek bir altyazıyı çevirmeyi dener.
+        """
+        prompt = f"""
+TASK: Translate this single subtitle to {self.target_language}
+INPUT: "{text}"
+IMPORTANT: Return ONLY the translated text, nothing else.
+"""
+        try:
+            response = model.generate_content(prompt)
+            return response.text.strip().strip('"').strip("'")
         except Exception as e:
-            e = str(e)
-            if "block" in e:
-                print(e)
-                batch.clear()
-            elif "quota" in e:
+            if "quota" in str(e).lower():
                 print("Quota exceeded, waiting 1 minute...")
                 time.sleep(60)
-            else:
-                print(e)
+            return None
+
+    def _translate_with_alternative(self, model, text):
+        """
+        Alternatif çeviri yöntemi - son çare olarak kullanılır.
+        """
+        prompt = f"""
+TASK: Simple translation
+FROM: "{text}"
+TO: {self.target_language}
+RETURN: Only translated text
+"""
+        try:
+            response = model.generate_content(prompt)
+            return response.text.strip().strip('"').strip("'")
+        except:
+            return None
