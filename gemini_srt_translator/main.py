@@ -150,7 +150,6 @@ class GeminiSRTTranslator:
         """
         response = chat.send_message(json.dumps(batch))
         translated_lines: list[SubtitleObject] = json.loads(response.text)
-        print(translated_lines)
         if len(translated_lines) != len(batch):
             raise Exception("Gemini has returned the wrong number of lines.")
         for line in translated_lines:
