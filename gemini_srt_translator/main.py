@@ -156,7 +156,7 @@ class GeminiSRTTranslator:
             if line["index"] not in [x["index"] for x in batch]:
                 raise Exception("Gemini has returned different indices.")
             if self.dominant_strong_direction(line["content"]) == "rtl":
-                translated_subtitle[int(line["index"])].content = f"\u202B{line["content"]}\u202C"
+                translated_subtitle[int(line["index"])].content = f"\u202B{line['content']}\u202C"
             else:
                 translated_subtitle[int(line["index"])].content = line["content"]
         batch.clear()
