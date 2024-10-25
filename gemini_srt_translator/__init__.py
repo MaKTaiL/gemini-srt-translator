@@ -35,8 +35,10 @@ gemini_api_key: str = None
 target_language: str = None
 input_file: str = None
 output_file: str = None
+description: str = None
 model_name: str = None
 batch_size: int = None
+free_quota: bool = None
 
 def listmodels():
     """
@@ -83,11 +85,17 @@ def translate():
     # (Optional) Path to save the translated subtitle file
     gst.output_file = "translated_subtitle.srt"
 
+    # (Optional) Additional description of the translation task
+    gst.description = "This subtitle is from a TV Series called 'Friends'."
+
     # (Optional) Model name to use for translation
     gst.model_name = "gemini-1.5-flash"
 
     # (Optional) Batch size for translation
     gst.batch_size = 30
+
+    # (Optional) Use free quota for translation (default: True)
+    gst.free_quota = True
 
     gst.translate()
     ```
@@ -101,8 +109,10 @@ def translate():
         'target_language': target_language,
         'input_file': input_file,
         'output_file': output_file,
+        'description': description,
         'model_name': model_name,
-        'batch_size': batch_size
+        'batch_size': batch_size,
+        'free_quota': free_quota
     }
     
     # Filter out None values

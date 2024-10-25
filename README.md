@@ -58,8 +58,10 @@ This will translate the subtitles in the `subtitle.srt` file to French.
 You can further customize the translation settings by providing optional parameters:
 
 - `output_file`: Path to save the translated subtitle file.
+- `description`: Description of the translation job.
 - `model_name`: Model name to use for translation.
 - `batch_size`: Batch size for translation.
+- `free_quota`: Use free quota for translation (default: True).
 
 Example:
 
@@ -70,8 +72,10 @@ gst.gemini_api_key = "your_gemini_api_key_here"
 gst.target_language = "French"
 gst.input_file = "subtitle.srt"
 gst.output_file = "subtitle_translated.srt"
+gst.description = "Translation of subtitle file"
 gst.model_name = "gemini-1.5-flash"
 gst.batch_size = 30
+gst.free_quota = True
 
 gst.translate()
 ```
