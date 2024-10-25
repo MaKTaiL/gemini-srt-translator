@@ -138,7 +138,6 @@ The size of the list must remain the same as the one you received."""
                         batch.clear()
                         break
                     elif "quota" in e:
-                        print(e)
                         print("Quota exceeded, waiting 1 minute...")
                         time.sleep(60)
                     else:
@@ -151,7 +150,10 @@ The size of the list must remain the same as the one you received."""
                                 i -= 1
                                 batch.pop()
                             self.batch_size -= decrement
-                        print(e)
+                        if "finish_reason" in e:
+                            print("Gemini has blocked the translation for unknown reasons")
+                        else:
+                            print(e)
                         print("Decreasing batch size to {} and trying again...".format(self.batch_size))
             
             translated_file.write(srt.compose(translated_subtitle))
