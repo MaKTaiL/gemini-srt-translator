@@ -1,4 +1,4 @@
-# main.py
+# gemini_srt_translator.py
 
 import typing
 import json
