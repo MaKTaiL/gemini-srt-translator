@@ -21,8 +21,7 @@ class SubtitleObject(typing.TypedDict):
 class GeminiSRTTranslator:
     def __init__(self, gemini_api_key: str = None, gemini_api_key2: str = None, target_language: str = None, input_file: str = None, output_file: str = None, description: str = None, model_name: str = "gemini-1.5-flash", batch_size: int = 30, free_quota: bool = True):
         self.gemini_api_key = gemini_api_key
-        self.gemini_api_key2 = gemini_api_key2
-        self.current_api_key = gemini_api_key  # Aktif API anahtarı
+        self.gemini_api_key2 = gemini_api_key2  # İkinci API anahtarı
         self.target_language = target_language
         self.input_file = input_file
         self.output_file = output_file
@@ -30,23 +29,14 @@ class GeminiSRTTranslator:
         self.model_name = model_name
         self.batch_size = batch_size
         self.free_quota = free_quota
-
-    def switch_api_key(self):
-        """
-        API anahtarını değiştirir.
-        """
-        if self.current_api_key == self.gemini_api_key and self.gemini_api_key2:
-            self.current_api_key = self.gemini_api_key2
-            print("Switching to second API key...")
-            return True
-        return False
+        self.current_api_key = self.gemini_api_key  # Başlangıçta ilk API anahtarını kullan
 
     def listmodels(self):
         """
-        Lists available models from the Gemini API.
+        Gemini API'sinden kullanılabilen modelleri listeler.
         """
-        if not self.gemini_api_key:
-            raise Exception("Please provide a valid Gemini API key.")
+        if not self.current_api_key:
+            raise Exception("Lütfen geçerli bir Gemini API anahtarı sağlayın.")
 
         genai.configure(api_key=self.current_api_key)
         models = genai.list_models()
@@ -56,16 +46,16 @@ class GeminiSRTTranslator:
 
     def translate(self):
         """
-        Translates a subtitle file using the Gemini API.
+        Bir altyazı dosyasını Gemini API'sini kullanarak çevirir.
         """
-        if not self.gemini_api_key:
-            raise Exception("Please provide a valid Gemini API key.")
+        if not self.current_api_key:
+            raise Exception("Lütfen geçerli bir Gemini API anahtarı sağlayın.")
         
         if not self.target_language:
-            raise Exception("Please provide a target language.")
+            raise Exception("Lütfen bir hedef dil sağlayın.")
         
         if not self.input_file:
-            raise Exception("Please provide a subtitle file.")
+            raise Exception("Lütfen bir altyazı dosyası sağlayın.")
         
         if not self.output_file:
             self.output_file = ".".join(self.input_file.split(".")[:-1]) + "_translated.srt"
@@ -150,7 +140,9 @@ The size of the list must remain the same as the one you received."""
                         batch.clear()
                         break
                     elif "quota" in e:
-                        if self.switch_api_key():  # İkinci API'ye geçiş dene
+                        if self.current_api_key == self.gemini_api_key and self.gemini_api_key2:
+                            print("Quota exceeded for first API key, switching to second API key...")
+                            self.current_api_key = self.gemini_api_key2
                             genai.configure(api_key=self.current_api_key)
                             model = genai.GenerativeModel(
                                 model_name=self.model_name,
@@ -163,9 +155,8 @@ The size of the list must remain the same as the one you received."""
                                 system_instruction=instruction,
                                 generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0)
                             )
-                            continue
                         else:
-                            print("Quota exceeded and no backup API key available, waiting 1 minute...")
+                            print("Quota exceeded, waiting 1 minute...")
                             time.sleep(60)
                     else:
                         if self.batch_size == 1:
@@ -187,7 +178,7 @@ The size of the list must remain the same as the one you received."""
 
     def _process_batch(self, model: GenerativeModel, batch: list[SubtitleObject], previous_message: ContentDict, translated_subtitle: list[Subtitle]) -> ContentDict:
         """
-        Processes a batch of subtitles.
+        Bir grup altyazıyı işler.
         """
         if previous_message:
             messages = [previous_message] + [{"role": "user", "parts": json.dumps(batch)}]
@@ -209,7 +200,7 @@ The size of the list must remain the same as the one you received."""
 
     def dominant_strong_direction(self, s: str) -> str:
         """
-        Determines the dominant strong direction of a string.
+        Bir dizenin baskın güçlü yönünü belirler.
         """
         count = Counter([ud.bidirectional(c) for c in list(s)])
         rtl_count = count['R'] + count['AL'] + count['RLE'] + count["RLI"]
