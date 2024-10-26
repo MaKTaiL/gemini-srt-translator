@@ -1,4 +1,4 @@
-# gemini_srt_translator.py
+# main.py
 
 import typing
 import json
@@ -19,8 +19,10 @@ class SubtitleObject(typing.TypedDict):
     _blank: str
 
 class GeminiSRTTranslator:
-    def __init__(self, gemini_api_key: str = None, target_language: str = None, input_file: str = None, output_file: str = None, description: str = None, model_name: str = "gemini-1.5-flash", batch_size: int = 30, free_quota: bool = True):
+    def __init__(self, gemini_api_key: str = None, gemini_api_key2: str = None, target_language: str = None, input_file: str = None, output_file: str = None, description: str = None, model_name: str = "gemini-1.5-flash", batch_size: int = 30, free_quota: bool = True):
         self.gemini_api_key = gemini_api_key
+        self.gemini_api_key2 = gemini_api_key2
+        self.current_api_key = gemini_api_key  # Aktif API anahtarı
         self.target_language = target_language
         self.input_file = input_file
         self.output_file = output_file
@@ -29,6 +31,16 @@ class GeminiSRTTranslator:
         self.batch_size = batch_size
         self.free_quota = free_quota
 
+    def switch_api_key(self):
+        """
+        API anahtarını değiştirir.
+        """
+        if self.current_api_key == self.gemini_api_key and self.gemini_api_key2:
+            self.current_api_key = self.gemini_api_key2
+            print("Switching to second API key...")
+            return True
+        return False
+
     def listmodels(self):
         """
         Lists available models from the Gemini API.
@@ -36,7 +48,7 @@ class GeminiSRTTranslator:
         if not self.gemini_api_key:
             raise Exception("Please provide a valid Gemini API key.")
 
-        genai.configure(api_key=self.gemini_api_key)
+        genai.configure(api_key=self.current_api_key)
         models = genai.list_models()
         for model in models:
             if "generateContent" in model.supported_generation_methods:
@@ -58,7 +70,7 @@ class GeminiSRTTranslator:
         if not self.output_file:
             self.output_file = ".".join(self.input_file.split(".")[:-1]) + "_translated.srt"
 
-        genai.configure(api_key=self.gemini_api_key)
+        genai.configure(api_key=self.current_api_key)
 
         instruction = f"""You are an assistant that translates subtitles to {self.target_language}.
 You will receive the following JSON type:
@@ -138,8 +150,23 @@ The size of the list must remain the same as the one you received."""
                         batch.clear()
                         break
                     elif "quota" in e:
-                        print("Quota exceeded, waiting 1 minute...")
-                        time.sleep(60)
+                        if self.switch_api_key():  # İkinci API'ye geçiş dene
+                            genai.configure(api_key=self.current_api_key)
+                            model = genai.GenerativeModel(
+                                model_name=self.model_name,
+                                safety_settings={
+                                    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                                    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                                    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                                    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+                                },
+                                system_instruction=instruction,
+                                generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0)
+                            )
+                            continue
+                        else:
+                            print("Quota exceeded and no backup API key available, waiting 1 minute...")
+                            time.sleep(60)
                     else:
                         if self.batch_size == 1:
                             raise Exception("Translation failed, aborting...")
