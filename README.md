@@ -45,6 +45,7 @@ You can translate subtitles using the `translate` command:
 import gemini_srt_translator as gst
 
 gst.gemini_api_key = "your_gemini_api_key_here"
+gst.gemini_api_key2 = "your_gemini_api_key_here"
 gst.target_language = "French"
 gst.input_file = "subtitle.srt"
 
