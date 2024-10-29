@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="gemini-srt-translator",
-    version="1.2.6",
+    version="1.3.0",
     packages=find_packages(),
     install_requires=[
         "google-generativeai==0.8.3",

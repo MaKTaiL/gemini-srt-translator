@@ -32,6 +32,7 @@
 from .main import GeminiSRTTranslator
 
 gemini_api_key: str = None
+gemini_api_key2: str = None
 target_language: str = None
 input_file: str = None
 output_file: str = None
@@ -82,6 +83,9 @@ def translate():
     # Path to the subtitle file to translate
     gst.input_file = "subtitle.srt"
 
+    # (Optional) Gemini API key 2 for additional quota
+    gst.gemini_api_key2 = "your_gemini_api_key2_here"
+
     # (Optional) Path to save the translated subtitle file
     gst.output_file = "translated_subtitle.srt"
 
@@ -106,6 +110,7 @@ def translate():
     """
     params = {
         'gemini_api_key': gemini_api_key,
+        'gemini_api_key2': gemini_api_key2,
         'target_language': target_language,
         'input_file': input_file,
         'output_file': output_file,

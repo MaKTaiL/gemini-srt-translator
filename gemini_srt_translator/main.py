@@ -19,12 +19,10 @@ class SubtitleObject(typing.TypedDict):
     """
     index: str
     content: str
-    _blank: str
 
 class GeminiSRTTranslator:
     """
     A translator class that uses Gemini API to translate subtitles.
-    Supports dual API keys for automatic failover when quota is exceeded.
     """
     def __init__(self, gemini_api_key: str = None, gemini_api_key2: str = None, target_language: str = None, 
                  input_file: str = None, output_file: str = None, description: str = None, 
@@ -34,19 +32,20 @@ class GeminiSRTTranslator:
 
         Args:
             gemini_api_key (str): Primary Gemini API key
-            gemini_api_key2 (str): Secondary Gemini API key for failover
+            gemini_api_key2 (str): Secondary Gemini API key for additional quota
             target_language (str): Target language for translation
             input_file (str): Path to input subtitle file
             output_file (str): Path to output translated subtitle file
             description (str): Additional instructions for translation
             model_name (str): Gemini model to use
             batch_size (int): Number of subtitles to process in each batch
-            free_quota (bool): Whether using free quota (affects rate limiting)
+            free_quota (bool): Whether to use free quota (affects rate limiting)
         """
         self.gemini_api_key = gemini_api_key
         self.gemini_api_key2 = gemini_api_key2
         self.current_api_key = gemini_api_key
         self.current_api_number = 1
+        self.backup_api_number = 2
         self.target_language = target_language
         self.input_file = input_file
         self.output_file = output_file
@@ -54,42 +53,6 @@ class GeminiSRTTranslator:
         self.model_name = model_name
         self.batch_size = batch_size
         self.free_quota = free_quota
-
-    def switch_api(self) -> bool:
-        """
-        Switch to the secondary API key if available.
-
-        Returns:
-            bool: True if switched successfully, False if no alternative API available
-        """
-        if self.current_api_number == 1 and self.gemini_api_key2:
-            self.current_api_key = self.gemini_api_key2
-            self.current_api_number = 2
-            return True
-        return False
-
-    def get_model(self, instruction: str) -> GenerativeModel:
-        """
-        Configure and return a Gemini model instance with current API key.
-
-        Args:
-            instruction (str): System instruction for the model
-
-        Returns:
-            GenerativeModel: Configured Gemini model instance
-        """
-        genai.configure(api_key=self.current_api_key)
-        return genai.GenerativeModel(
-            model_name=self.model_name,
-            safety_settings={
-                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-            },
-            system_instruction=instruction,
-            generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0)
-        )
 
     def listmodels(self):
         """List available Gemini models that support content generation."""
@@ -137,7 +100,7 @@ The size of the list must remain the same as the one you received."""
         if self.description:
             instruction += "\nAdditional user instruction: '" + self.description + "'"
 
-        model = self.get_model(instruction)
+        model = self._get_model(instruction)
 
         with open(self.input_file, "r", encoding="utf-8") as original_file, open(self.output_file, "w", encoding="utf-8") as translated_file:
             original_text = original_file.read()
@@ -150,16 +113,23 @@ The size of the list must remain the same as the one you received."""
             previous_message = None
             reverted = 0
             delay = False
+            delay_time = 30
 
             if 'pro' in self.model_name and self.free_quota:
                 delay = True
-                print("Pro model and free user quota detected, enabling 30s delay between requests...")
+                if not self.gemini_api_key2:
+                    print("Pro model and free user quota detected, enabling 30s delay between requests...")
+                else:
+                    delay_time = 15
+                    print("Pro model and free user quota detected, using secondary API key for additional quota...")
 
             batch.append(SubtitleObject(index=str(i), content=original_subtitle[i].content))
             i += 1
 
             print(f"Starting translation of {total} lines...")
-            print(f"Currently using API-{self.current_api_number}")
+
+            if self.gemini_api_key2:
+                print(f"Starting with API {self.current_api_number}:")
 
             while len(batch) > 0:
                 if i < total and len(batch) < self.batch_size:
@@ -171,7 +141,7 @@ The size of the list must remain the same as the one you received."""
                     previous_message = self._process_batch(model, batch, previous_message, translated_subtitle)
                     end_time = time.time()
                     print(f"Translated {i}/{total}")
-                    if delay and (end_time - start_time < 30):
+                    if delay and (end_time - start_time < delay_time):
                         time.sleep(30 - (end_time - start_time))
                     if reverted > 0:
                         self.batch_size += reverted
@@ -182,19 +152,11 @@ The size of the list must remain the same as the one you received."""
                         i += 1
                 except Exception as e:
                     e_str = str(e)
-                    print(f"\nError message: {e_str}")  # Print the error message for debugging
                     
-                    if "block" in e_str:
-                        print(e_str)
-                        batch.clear()
-                        break
-                    elif any(error in e_str.lower() for error in ["quota", "rate", "limit", "exceeded"]):
-                        if self.switch_api():
-                            print(f"\n🔄 API-1 quota exceeded! Switching to API-2...")
-                            print(f"Lines translated so far: {i}/{total}")
-                            model = self.get_model(instruction)
-                            print(f"Now using API-{self.current_api_number}\n")
-                            continue  # Continue immediately with new API
+                    if "quota" in e_str:
+                        if self._switch_api():
+                            print(f"\n🔄 API {self.backup_api_number} quota exceeded! Switching to API {self.current_api_number}...")
+                            model = self._get_model(instruction)
                         else:
                             print("\nAll API quotas exceeded, waiting 1 minute...")
                             time.sleep(60)
@@ -208,13 +170,55 @@ The size of the list must remain the same as the one you received."""
                                 i -= 1
                                 batch.pop()
                             self.batch_size -= decrement
-                        if "finish_reason" in e_str:
-                            print("Gemini has blocked the translation for unknown reasons")
-                        else:
+                        if "Gemini" in e_str:
                             print(e_str)
+                        else:
+                            print("An unexpected error has occurred")
                         print("Decreasing batch size to {} and trying again...".format(self.batch_size))
             
             translated_file.write(srt.compose(translated_subtitle))
+
+    def _switch_api(self) -> bool:
+        """
+        Switch to the secondary API key if available.
+
+        Returns:
+            bool: True if switched successfully, False if no alternative API available
+        """
+        if self.current_api_number == 1 and self.gemini_api_key2:
+            self.current_api_key = self.gemini_api_key2
+            self.current_api_number = 2
+            self.backup_api_number = 1
+            return True
+        if self.current_api_number == 2 and self.gemini_api_key:
+            self.current_api_key = self.gemini_api_key
+            self.current_api_number = 1
+            self.backup_api_number = 2
+            return True
+        return False
+
+    def _get_model(self, instruction: str) -> GenerativeModel:
+        """
+        Configure and return a Gemini model instance with current API key.
+
+        Args:
+            instruction (str): System instruction for the model
+
+        Returns:
+            GenerativeModel: Configured Gemini model instance
+        """
+        genai.configure(api_key=self.current_api_key)
+        return genai.GenerativeModel(
+            model_name=self.model_name,
+            safety_settings={
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+            },
+            system_instruction=instruction,
+            generation_config=genai.GenerationConfig(response_mime_type="application/json")
+        )
 
     def _process_batch(self, model: GenerativeModel, batch: list[SubtitleObject], previous_message: ContentDict, translated_subtitle: list[Subtitle]) -> ContentDict:
         """
@@ -242,7 +246,7 @@ The size of the list must remain the same as the one you received."""
         for line in translated_lines:
             if line["index"] not in [x["index"] for x in batch]:
                 raise Exception("Gemini has returned different indices.")
-            if self.dominant_strong_direction(line["content"]) == "rtl":
+            if self._dominant_strong_direction(line["content"]) == "rtl":
                 translated_subtitle[int(line["index"])].content = f"\u202B{line['content']}\u202C"
             else:
                 translated_subtitle[int(line["index"])].content = line["content"]
@@ -250,7 +254,7 @@ The size of the list must remain the same as the one you received."""
         batch.clear()
         return response.candidates[0].content
 
-    def dominant_strong_direction(self, s: str) -> str:
+    def _dominant_strong_direction(self, s: str) -> str:
         """
         Determine the dominant text direction (RTL or LTR) of a string.
 
