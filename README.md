@@ -57,6 +57,7 @@ This will translate the subtitles in the `subtitle.srt` file to French.
 
 You can further customize the translation settings by providing optional parameters:
 
+- `gemini_api_key2`: Second Gemini API key for additional quota.
 - `output_file`: Path to save the translated subtitle file.
 - `description`: Description of the translation job.
 - `model_name`: Model name to use for translation.
@@ -69,6 +70,7 @@ Example:
 import gemini_srt_translator as gst
 
 gst.gemini_api_key = "your_gemini_api_key_here"
+gst.gemini_api_key2 = "your_gemini_api_key2_here"
 gst.target_language = "French"
 gst.input_file = "subtitle.srt"
 gst.output_file = "subtitle_translated.srt"
