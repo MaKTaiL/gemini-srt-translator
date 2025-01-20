@@ -234,9 +234,9 @@ The size of the list must remain the same as the one you received."""
             ContentDict: The model's response for context in next batch
         """
         if previous_message:
-            messages = [previous_message] + [{"role": "user", "parts": json.dumps(batch)}]
+            messages = [previous_message] + [{"role": "user", "parts": json.dumps(batch, ensure_ascii=False)}]
         else:
-            messages = [{"role": "user", "parts": json.dumps(batch)}]
+            messages = [{"role": "user", "parts": json.dumps(batch, ensure_ascii=False)}]
         response = model.generate_content(messages)
         translated_lines: list[SubtitleObject] = json.loads(response.text)
         
