@@ -26,7 +26,7 @@ class GeminiSRTTranslator:
     """
     def __init__(self, gemini_api_key: str = None, gemini_api_key2: str = None, target_language: str = None, 
                  input_file: str = None, output_file: str = None, description: str = None, 
-                 model_name: str = "gemini-1.5-flash", batch_size: int = 30, free_quota: bool = True):
+                 model_name: str = "gemini-2.0-flash", batch_size: int = 30, free_quota: bool = True):
         """
         Initialize the translator with necessary parameters.
 
