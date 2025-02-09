@@ -7,6 +7,9 @@ setup(
     install_requires=[
         "google-generativeai==0.8.4",
         "srt==3.5.3",
+        "pydub==0.25.1",
+        "fs==2.4.16",
+        "pysrt==1.1.2",
     ],
     author="Matheus Castro",
     description="A tool to translate subtitles using Google Generative AI",

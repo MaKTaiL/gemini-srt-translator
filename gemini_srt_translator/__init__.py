@@ -40,6 +40,9 @@ description: str = None
 model_name: str = None
 batch_size: int = None
 free_quota: bool = None
+is_input_audio: bool = False
+model_name_audio: str = None
+
 
 def listmodels():
     """
@@ -117,7 +120,9 @@ def translate():
         'description': description,
         'model_name': model_name,
         'batch_size': batch_size,
-        'free_quota': free_quota
+        'free_quota': free_quota,
+        'is_input_audio': is_input_audio,
+        'model_name_audio': model_name_audio,
     }
     
     # Filter out None values
