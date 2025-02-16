@@ -182,18 +182,18 @@ subtitle segment 3
                             raise Exception(f"""Subtitle item duration's too short: {item.duration}""")
                         if idx > 0:
                             gap = max(subs[idx].start - subs[idx-1].start, subs[idx].end - subs[idx-1].end)
-                            if (gap > "00:03:00,000"):
+                            if (gap > "00:02:00,000"):
                                 raise Exception(f"""Gap between items is too far: {gap}""")
                     with mem_fs.open('tmp-srt.srt', 'w', encoding='utf-8') as f:
                         subs.write_into(f)
                 except Exception as e:
-                    print(response)
                     print(f"""Error: {e}""")
                     error += 1
                     if error > 5:
                         raise Exception(f"""Too many errors: {error}""")
-                    print("Sleep for 1 min before re-trying")
-                    time.sleep(60)
+                    if "quota" in str(e):
+                        print("Sleep for 1 min before re-trying")
+                        time.sleep(60)
                     segment_length = random.randint(100000, 200000)
                     print(f"""Reading audio file: {self.input_file}""")
                     print(f"""Try to re-segment audio from {start} with segment length {segment_length}""")
