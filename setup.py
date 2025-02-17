@@ -2,10 +2,10 @@ from setuptools import setup, find_packages
 
 setup(
     name="gemini-srt-translator",
-    version="1.3.2",
+    version="1.3.3",
     packages=find_packages(),
     install_requires=[
-        "google-generativeai==0.8.3",
+        "google-generativeai==0.8.4",
         "srt==3.5.3",
     ],
     author="Matheus Castro",

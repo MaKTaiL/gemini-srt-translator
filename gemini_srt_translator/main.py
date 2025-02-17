@@ -92,10 +92,12 @@ class SubtitleObject(typing.TypedDict):
 Request: list[SubtitleObject]
 Response: list[SubtitleObject]
 
-The 'index' key is the index of the subtitle line.
-The 'content' key is the text to be translated.
+The 'index' key is the index of the subtitle dialog.
+The 'content' key is the dialog to be translated.
 
-The size of the list must remain the same as the one you received."""
+The indices must remain the same in the response as in the request.
+Dialogs must be translated as they are without any changes.
+"""
 
         if self.description:
             instruction += "\nAdditional user instruction: '" + self.description + "'"
@@ -141,7 +143,7 @@ The size of the list must remain the same as the one you received."""
                     previous_message = self._process_batch(model, batch, previous_message, translated_subtitle)
                     end_time = time.time()
                     print(f"Translated {i}/{total}")
-                    if delay and (end_time - start_time < delay_time):
+                    if delay and (end_time - start_time < delay_time) and i < total:
                         time.sleep(30 - (end_time - start_time))
                     if reverted > 0:
                         self.batch_size += reverted
@@ -217,7 +219,7 @@ The size of the list must remain the same as the one you received."""
                 HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
             },
             system_instruction=instruction,
-            generation_config=genai.GenerationConfig(response_mime_type="application/json")
+            generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0)
         )
 
     def _process_batch(self, model: GenerativeModel, batch: list[SubtitleObject], previous_message: ContentDict, translated_subtitle: list[Subtitle]) -> ContentDict:

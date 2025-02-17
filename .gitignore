@@ -1,3 +1,7 @@
+# GST Files
+*.srt
+traduzir.py
+
 # Virtual environment
 venv/
 
