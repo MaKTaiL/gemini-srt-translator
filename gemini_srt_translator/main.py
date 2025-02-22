@@ -166,7 +166,7 @@ subtitle segment 3
                                 "mime_type": "audio/mp3",
                                 "data": f.readall()
                             }],
-                            generation_config=genai.GenerationConfig(response_mime_type="text/plain"),
+                            generation_config=genai.GenerationConfig(response_mime_type="text/plain", temperature=0),
                         )
                     subs = pysrt.from_string(response.text.strip().replace("---", "\n"))
                     subs.shift(milliseconds=start)
@@ -385,13 +385,6 @@ Dialogs must be translated as they are without any changes.
 
         response = model.generate_content(messages)
         translated_lines: list[SubtitleObject] = json.loads(response.text)
-
-        # Sampled logging at 30% rate
-        if (int(time.time()) % 3 == 1):
-            print("input:")
-            print(messages)
-            print("response:")
-            print(response.text)
 
         if len(translated_lines) != len(batch):
             raise Exception("Gemini has returned the wrong number of lines.")
