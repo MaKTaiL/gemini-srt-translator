@@ -10,6 +10,7 @@ setup(
         "pydub==0.25.1",
         "fs==2.4.16",
         "pysrt==1.1.2",
+        "python-ffmpeg==2.0.12",
     ],
     author="Matheus Castro",
     description="A tool to translate subtitles using Google Generative AI",

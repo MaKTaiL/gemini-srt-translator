@@ -42,6 +42,7 @@ batch_size: int = None
 free_quota: bool = None
 is_input_audio: bool = False
 model_name_audio: str = None
+extract_srt_from_media: bool = False
 
 
 def listmodels():
@@ -123,6 +124,7 @@ def translate():
         'free_quota': free_quota,
         'is_input_audio': is_input_audio,
         'model_name_audio': model_name_audio,
+        'extract_srt_from_media': extract_srt_from_media,
     }
     
     # Filter out None values

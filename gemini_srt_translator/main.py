@@ -17,7 +17,7 @@ from pydub import AudioSegment, silence
 from fs.memoryfs import MemoryFS
 import pysrt
 import random
-
+from ffmpeg import FFmpeg
 
 class SubtitleObject(typing.TypedDict):
     """
@@ -34,7 +34,8 @@ class GeminiSRTTranslator:
                  input_file: str = None, output_file: str = None, description: str = None, 
                  model_name: str = "gemini-2.0-flash", batch_size: int = 30, free_quota: bool = True,
                  is_input_audio: bool = False,
-                 model_name_audio: str = "gemini-2.0-flash-thinking-exp"):
+                 model_name_audio: str = "gemini-2.0-flash-thinking-exp",
+                 extract_srt_from_media: bool = False):
         """
         Initialize the translator with necessary parameters.
 
@@ -49,6 +50,8 @@ class GeminiSRTTranslator:
             batch_size (int): Number of subtitles to process in each batch
             free_quota (bool): Whether to use free quota (affects rate limiting)
             is_input_audio (bool): Whether input file is in an audio format
+            model_name_audio (str): Gemini model to use for audio transcribing
+            extract_srt_from_media (bool): Whether to extract input srt from input file
         """
         self.gemini_api_key = gemini_api_key
         self.gemini_api_key2 = gemini_api_key2
@@ -64,6 +67,7 @@ class GeminiSRTTranslator:
         self.free_quota = free_quota
         self.is_input_audio = is_input_audio
         self.model_name_audio = model_name_audio
+        self.extract_srt_from_media = extract_srt_from_media
 
     def listmodels(self):
         """List available Gemini models that support content generation."""
@@ -217,6 +221,17 @@ subtitle segment 3
             with open(f"""{self.output_file}.tmp""", 'w', encoding='utf-8') as f:
                 final_subs.write_into(f)
             self.input_file = f"""{self.output_file}.tmp"""
+
+        if self.extract_srt_from_media:
+            try:
+                ffmpeg = FFmpeg().input(self.input_file).output(f"""{self.input_file}.srt.tmp""", {"c:s" : "text", "f" : "srt"})
+                ffmpeg.execute()
+                self.input_file = f"""{self.input_file}.srt.tmp"""
+            except Exception as e:
+                print(f"""Error: extract srt from {self.input_file}""")
+                print(e)
+                raise Exception(e)
+
 
         instruction = f"""You are a professional translator proficient in all languages, specializing in translating subtitles for film and television.
         Your task is to translate the following subtitles into {self.target_language}.
