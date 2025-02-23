@@ -13,7 +13,7 @@ import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold, ContentDict
 from google.generativeai import GenerativeModel
 
-from pydub import AudioSegment, silence
+from pydub import AudioSegment 
 from fs.memoryfs import MemoryFS
 import pysrt
 import random
