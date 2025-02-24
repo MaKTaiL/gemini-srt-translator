@@ -75,7 +75,7 @@ gst.target_language = "French"
 gst.input_file = "subtitle.srt"
 gst.output_file = "subtitle_translated.srt"
 gst.description = "Translation of subtitle file"
-gst.model_name = "gemini-1.5-flash"
+gst.model_name = "gemini-2.0-flash"
 gst.batch_size = 30
 gst.free_quota = True
 

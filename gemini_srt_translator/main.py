@@ -2,6 +2,7 @@
 
 import typing
 import json
+import json_repair
 import time
 import unicodedata as ud
 
@@ -90,7 +91,6 @@ class SubtitleObject(typing.TypedDict):
     content: str
 
 Request: list[SubtitleObject]
-Response: list[SubtitleObject]
 
 The 'index' key is the index of the subtitle dialog.
 The 'content' key is the dialog to be translated.
@@ -175,7 +175,7 @@ Dialogs must be translated as they are without any changes.
                         if "Gemini" in e_str:
                             print(e_str)
                         else:
-                            print("An unexpected error has occurred")
+                            print("An unexpected error has occurred: {}".format(e_str))
                         print("Decreasing batch size to {} and trying again...".format(self.batch_size))
             
             translated_file.write(srt.compose(translated_subtitle))
@@ -219,7 +219,7 @@ Dialogs must be translated as they are without any changes.
                 HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
             },
             system_instruction=instruction,
-            generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0)
+            generation_config=genai.GenerationConfig(response_mime_type="application/json")
         )
 
     def _process_batch(self, model: GenerativeModel, batch: list[SubtitleObject], previous_message: ContentDict, translated_subtitle: list[Subtitle]) -> ContentDict:
@@ -240,7 +240,7 @@ Dialogs must be translated as they are without any changes.
         else:
             messages = [{"role": "user", "parts": json.dumps(batch, ensure_ascii=False)}]
         response = model.generate_content(messages)
-        translated_lines: list[SubtitleObject] = json.loads(response.text)
+        translated_lines: list[SubtitleObject] = json_repair.loads(response.text)
         
         if len(translated_lines) != len(batch):
             raise Exception("Gemini has returned the wrong number of lines.")
