@@ -123,15 +123,16 @@ Dialogs must be translated as they are without any changes.
                     print("Pro model and free user quota detected, enabling 30s delay between requests...")
                 else:
                     delay_time = 15
-                    print("Pro model and free user quota detected, using secondary API key for additional quota...")
+                    print("\033[36mPro model and free user quota detected, using secondary API key for additional quota...\033[0m")
+                    print()
 
             batch.append(SubtitleObject(index=str(i), content=original_subtitle[i].content))
             i += 1
 
-            print(f"Starting translation of {total} lines...")
+            print(f"\033[95mStarting translation of {total} lines\033[0m")
 
             if self.gemini_api_key2:
-                print(f"Starting with API {self.current_api_number}:")
+                print(f"\033[96mStarting with API {self.current_api_number}:\033[0m")
 
             while len(batch) > 0:
                 if i < total and len(batch) < self.batch_size:
@@ -142,7 +143,7 @@ Dialogs must be translated as they are without any changes.
                     start_time = time.time()
                     previous_message = self._process_batch(model, batch, previous_message, translated_subtitle)
                     end_time = time.time()
-                    print(f"Translated {i}/{total}")
+                    print(f"\033[93mTranslated {i}/{total}\033[0m")
                     if delay and (end_time - start_time < delay_time) and i < total:
                         time.sleep(30 - (end_time - start_time))
                     if reverted > 0:
@@ -157,10 +158,10 @@ Dialogs must be translated as they are without any changes.
                     
                     if "quota" in e_str:
                         if self._switch_api():
-                            print(f"\n🔄 API {self.backup_api_number} quota exceeded! Switching to API {self.current_api_number}...")
+                            print(f"\n🔄 \033[96mAPI {self.backup_api_number} quota exceeded! Switching to API {self.current_api_number}...\033[0m")
                             model = self._get_model(instruction)
                         else:
-                            print("\nAll API quotas exceeded, waiting 1 minute...")
+                            print("\n\033[91mAll API quotas exceeded, waiting 1 minute...\033[0m")
                             time.sleep(60)
                     else:
                         if self.batch_size == 1:
