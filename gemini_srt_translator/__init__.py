@@ -36,6 +36,7 @@ gemini_api_key2: str = None
 target_language: str = None
 input_file: str = None
 output_file: str = None
+start_line: int = None
 description: str = None
 model_name: str = None
 batch_size: int = None
@@ -60,8 +61,14 @@ def listmodels():
     Raises:
         Exception: If the Gemini API key is not provided.
     """
-    translator = GeminiSRTTranslator(gemini_api_key)
-    translator.listmodels()
+    translator = GeminiSRTTranslator(gemini_api_key = gemini_api_key)
+    models = translator.getmodels()
+    if models:
+        print("Available models:\n")
+        for model in models:
+            print(model)
+    else:
+        print("No models available or an error occurred while fetching models.")
 
 def translate():
     """
@@ -89,11 +96,14 @@ def translate():
     # (Optional) Path to save the translated subtitle file
     gst.output_file = "translated_subtitle.srt"
 
+    # (Optional) Line number to start translation from
+    gst.start_line = 120
+
     # (Optional) Additional description of the translation task
     gst.description = "This subtitle is from a TV Series called 'Friends'."
 
     # (Optional) Model name to use for translation
-    gst.model_name = "gemini-1.5-flash"
+    gst.model_name = "gemini-2.0-flash"
 
     # (Optional) Batch size for translation
     gst.batch_size = 30
@@ -114,6 +124,7 @@ def translate():
         'target_language': target_language,
         'input_file': input_file,
         'output_file': output_file,
+        'start_line': start_line,
         'description': description,
         'model_name': model_name,
         'batch_size': batch_size,
