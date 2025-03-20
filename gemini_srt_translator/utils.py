@@ -75,6 +75,8 @@ def upgrade_package(package_name):
                 stop_progress.set()
                 progress_thread.join()
                 
-            print(f"\n{package_name} upgraded to version {latest_version}.\n")
+            print(f"\n{package_name} upgraded to version {latest_version}.")
+            print("Please restart your script.\n")
+            exit(0)
         else:
             print(f"{package_name} upgrade skipped.\n")
