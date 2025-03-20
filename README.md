@@ -19,7 +19,7 @@ Gemini SRT Translator is a tool designed to translate subtitle files using Googl
 To install Gemini SRT Translator, use pip:
 
 ```sh
-pip install gemini-srt-translator
+pip install --upgrade gemini-srt-translator
 ```
 
 ## Setup
@@ -60,10 +60,12 @@ You can also specify the `start_line` parameter directly in the script and skip 
 
 ```python
 import gemini_srt_translator as gst
+
 gst.gemini_api_key = "your_gemini_api_key_here"
 gst.target_language = "French"
 gst.input_file = "subtitle.srt"
 gst.start_line = 20
+
 gst.translate()
 ```
 
@@ -78,6 +80,7 @@ You can further customize the translation settings by providing optional paramet
 - `model_name`: Model name to use for translation. (default: "gemini-2.0-flash")
 - `batch_size`: Batch size for translation. (default: 30)
 - `free_quota`: Use free quota for translation (default: True).
+- `skip_upgrade`: Skip version upgrade check (default: False).
 
 Example:
 
@@ -94,6 +97,7 @@ gst.description = "Translation of a medical television series, use medical terms
 gst.model_name = "gemini-2.0-flash"
 gst.batch_size = 30
 gst.free_quota = True
+gst.skip_upgrade = True
 
 gst.translate()
 ```
