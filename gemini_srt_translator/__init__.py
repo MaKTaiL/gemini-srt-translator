@@ -30,16 +30,19 @@
 """
 
 from .main import GeminiSRTTranslator
+from .utils import upgrade_package
 
 gemini_api_key: str = None
 gemini_api_key2: str = None
 target_language: str = None
 input_file: str = None
 output_file: str = None
+start_line: int = None
 description: str = None
 model_name: str = None
 batch_size: int = None
 free_quota: bool = None
+skip_upgrade: bool = False
 
 def listmodels():
     """
@@ -60,8 +63,14 @@ def listmodels():
     Raises:
         Exception: If the Gemini API key is not provided.
     """
-    translator = GeminiSRTTranslator(gemini_api_key)
-    translator.listmodels()
+    translator = GeminiSRTTranslator(gemini_api_key = gemini_api_key)
+    models = translator.getmodels()
+    if models:
+        print("Available models:\n")
+        for model in models:
+            print(model)
+    else:
+        print("No models available or an error occurred while fetching models.")
 
 def translate():
     """
@@ -89,17 +98,23 @@ def translate():
     # (Optional) Path to save the translated subtitle file
     gst.output_file = "translated_subtitle.srt"
 
+    # (Optional) Line number to start translation from
+    gst.start_line = 120
+
     # (Optional) Additional description of the translation task
     gst.description = "This subtitle is from a TV Series called 'Friends'."
 
     # (Optional) Model name to use for translation
-    gst.model_name = "gemini-1.5-flash"
+    gst.model_name = "gemini-2.0-flash"
 
     # (Optional) Batch size for translation
     gst.batch_size = 30
 
     # (Optional) Use free quota for translation (default: True)
     gst.free_quota = True
+
+    # (Optional) Skip package upgrade check
+    gst.skip_upgrade = True
 
     gst.translate()
     ```
@@ -114,11 +129,15 @@ def translate():
         'target_language': target_language,
         'input_file': input_file,
         'output_file': output_file,
+        'start_line': start_line,
         'description': description,
         'model_name': model_name,
         'batch_size': batch_size,
         'free_quota': free_quota
     }
+
+    if not skip_upgrade:
+        upgrade_package("gemini-srt-translator")
     
     # Filter out None values
     filtered_params = {k: v for k, v in params.items() if v is not None}
