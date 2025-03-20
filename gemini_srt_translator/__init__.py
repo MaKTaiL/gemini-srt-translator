@@ -30,6 +30,7 @@
 """
 
 from .main import GeminiSRTTranslator
+from .utils import upgrade_package
 
 gemini_api_key: str = None
 gemini_api_key2: str = None
@@ -41,6 +42,7 @@ description: str = None
 model_name: str = None
 batch_size: int = None
 free_quota: bool = None
+skip_upgrade: bool = False
 
 def listmodels():
     """
@@ -111,6 +113,9 @@ def translate():
     # (Optional) Use free quota for translation (default: True)
     gst.free_quota = True
 
+    # (Optional) Skip package upgrade check
+    gst.skip_upgrade = True
+
     gst.translate()
     ```
     Raises:
@@ -130,6 +135,9 @@ def translate():
         'batch_size': batch_size,
         'free_quota': free_quota
     }
+
+    if not skip_upgrade:
+        upgrade_package("gemini-srt-translator")
     
     # Filter out None values
     filtered_params = {k: v for k, v in params.items() if v is not None}
