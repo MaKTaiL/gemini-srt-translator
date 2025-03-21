@@ -5,6 +5,12 @@ import requests
 import time
 import threading
 
+# Import the logger functions
+from gemini_srt_translator.logger import (
+    info, warning, error, success, progress, highlight, 
+    set_color_mode, input_prompt, progress_bar
+)
+
 def get_installed_version(package_name):
     """Returns the installed version of a package, or None if not installed."""
     try:
@@ -47,16 +53,18 @@ def display_progress_bar(stop_event, package_name):
     sys.stdout.write(f"\rInstalling {package_name}: {bar} Complete!")
     sys.stdout.flush()
 
-def upgrade_package(package_name):
+def upgrade_package(package_name, use_colors=True):
     """Upgrades the package using pip if an update is available."""
     installed_version = get_installed_version(package_name)
     latest_version = get_latest_pypi_version(package_name)
 
+    set_color_mode(use_colors)
+
     if installed_version < latest_version:
-        print(f"There is a new version of {package_name} available: {latest_version}.")
-        answer = input(f"Do you want to upgrade {package_name} from version {installed_version} to {latest_version}? (y/n): ")
+        info(f"There is a new version of {package_name} available: {latest_version}.")
+        answer = input_prompt(f"Do you want to upgrade {package_name} from version {installed_version} to {latest_version}? (y/n): ")
         if answer.lower() == 'y':
-            print(f"Upgrading {package_name}...")
+            highlight(f"Upgrading {package_name}...")
             
             # Create and start a progress bar in a separate thread
             stop_progress = threading.Event()
@@ -75,8 +83,8 @@ def upgrade_package(package_name):
                 stop_progress.set()
                 progress_thread.join()
                 
-            print(f"\n{package_name} upgraded to version {latest_version}.")
-            print("Please restart your script.\n")
+            success(f"\n{package_name} upgraded to version {latest_version}.")
+            info("Please restart your script.\n")
             exit(0)
         else:
-            print(f"{package_name} upgrade skipped.\n")
+            info(f"{package_name} upgrade skipped.\n")

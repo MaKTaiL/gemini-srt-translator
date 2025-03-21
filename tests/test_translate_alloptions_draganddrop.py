@@ -1,16 +1,13 @@
 import gemini_srt_translator as gst
 import os
+import getpass
 
 # Set the API key for the Gemini service
-gst.gemini_api_key = ""
-gst.gemini_api_key2 = ""
-gst.target_language = "French"
-gst.input_file = "subtitle.srt"
-gst.output_file = "translated_subtitle.srt"
-gst.description = "This is a subtitle"
-gst.model_name = "gemini-2.0-pro-exp"
-gst.batch_size = 30
-gst.free_quota = True
+
+if not gst.gemini_api_key and not gst.gemini_api_key2:
+    input_gemini_api_key = getpass.getpass("\033[96mEnter your Gemini API key: \033[0m").strip()
+    if input_gemini_api_key:
+        gst.gemini_api_key = input_gemini_api_key
 
 # Allow the user to drag and drop the SRT file
 input_file = input("\033[96mDrag and drop the .srt file here and press Enter: \033[0m").strip().strip('"')
@@ -20,19 +17,13 @@ if not os.path.isfile(input_file) or not input_file.lower().endswith(".srt"):
     print("\033[31m[Error] The selected file is not valid or is not a .srt file.\033[0m")
     exit(1)
 
+# Set the target language for translation
+target_language = input("\033[96mEnter the target language (e.g., French, Spanish): \033[0m").strip()
+if target_language:
+    gst.target_language = target_language
+
 # List of available models
-available_models = [
-    "gemini-2.0-pro-exp",
-    "gemini-2.0-pro-exp-02-05",
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-exp",
-    "gemini-2.0-flash-lite-preview",
-    "gemini-1.5-pro",
-    "gemini-1.5-pro-latest",
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-001-tuning",
-    "gemini-1.5-flash-latest"
-]
+available_models = gst.getmodels()
 
 # Display options and select the model
 def select_model():
@@ -59,18 +50,10 @@ selected_model = select_model()
 gst.model_name = selected_model
 
 # Extract the folder and generate the path for the translated file
-def get_unique_output_path(base_path):
-    counter = 1
-    file_path = base_path
-    while os.path.exists(file_path):
-        file_name, file_ext = os.path.splitext(base_path)
-        file_path = f"{file_name}({counter}){file_ext}"
-        counter += 1
-    return file_path
+
 
 file_name = os.path.basename(input_file)
-output_file_base = os.path.join(os.path.dirname(input_file), file_name.replace(".srt", f"_translated_{selected_model}.srt"))
-output_file = get_unique_output_path(output_file_base)
+output_file = os.path.join(os.path.dirname(input_file), file_name.replace(".srt", f"_translated_{selected_model}.srt"))
 
 # Set input and output files
 gst.input_file = input_file

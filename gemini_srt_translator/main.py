@@ -6,6 +6,7 @@ import json_repair
 import time
 import unicodedata as ud
 import signal
+import os
 
 import srt
 from srt import Subtitle
@@ -14,6 +15,13 @@ from collections import Counter
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold, ContentDict
 from google.generativeai import GenerativeModel
+
+from gemini_srt_translator.logger import (
+    info, warning, error, success, highlight, 
+    set_color_mode, input_prompt, progress_bar,
+    warning_with_progress, error_with_progress, info_with_progress, 
+    success_with_progress, highlight_with_progress
+)
 
 class SubtitleObject(typing.TypedDict):
     """
@@ -28,7 +36,8 @@ class GeminiSRTTranslator:
     """
     def __init__(self, gemini_api_key: str = None, gemini_api_key2: str = None, target_language: str = None, 
                  input_file: str = None, output_file: str = None, start_line: int = 1, description: str = None, 
-                 model_name: str = "gemini-2.0-flash", batch_size: int = 30, free_quota: bool = True):
+                 model_name: str = "gemini-2.0-flash", batch_size: int = 30, free_quota: bool = True,
+                 use_colors: bool = True):
         """
         Initialize the translator with necessary parameters.
 
@@ -43,7 +52,17 @@ class GeminiSRTTranslator:
             model_name (str): Gemini model to use
             batch_size (int): Number of subtitles to process in each batch
             free_quota (bool): Whether to use free quota (affects rate limiting)
+            use_colors (bool): Whether to use colored output (default: True)
         """
+
+        if not output_file:
+            try:
+                self.output_file = ".".join(self.input_file.split(".")[:-1]) + "_translated.srt"
+            except:
+                pass
+        else:
+            self.output_file = output_file
+            
         self.gemini_api_key = gemini_api_key
         self.gemini_api_key2 = gemini_api_key2
         self.current_api_key = gemini_api_key
@@ -51,17 +70,83 @@ class GeminiSRTTranslator:
         self.backup_api_number = 2
         self.target_language = target_language
         self.input_file = input_file
-        self.output_file = output_file
         self.start_line = start_line
         self.description = description
         self.model_name = model_name
         self.batch_size = batch_size
         self.free_quota = free_quota
+        
+        # Set color mode based on user preference
+        set_color_mode(use_colors)
+
+        # Initialize progress tracking file path
+        self.progress_file = None
+        if input_file:
+            self.progress_file = os.path.join(os.path.dirname(input_file), 
+                                           f".{os.path.basename(input_file)}.progress")
+            
+        # Check for saved progress
+        self._check_saved_progress()
+
+    def _check_saved_progress(self):
+        """Check if there's a saved progress file and load it if exists"""
+        if not self.progress_file or not os.path.exists(self.progress_file):
+            return
+            
+        try:
+            with open(self.progress_file, 'r') as f:
+                data = json.load(f)
+                saved_line = data.get('line', 1)
+                input_file = data.get('input_file')
+                
+                # Verify the progress file matches our current input file
+                if input_file != self.input_file:
+                    warning(f"Found progress file for different subtitle: {input_file}")
+                    warning("Ignoring saved progress.")
+                    return
+                
+                if saved_line > 1 and self.start_line == 1:
+                    resume = input_prompt(f"Found saved progress. Resume? (y/n): ").lower().strip()
+                    if resume == 'y' or resume == 'yes':
+                        info(f"Resuming from line {saved_line}")
+                        self.start_line = saved_line
+                    else:
+                        info("Starting from the beginning")
+                        # Remove the progress file
+                        try:
+                            os.remove(self.output_file)
+                        except Exception as e:
+                            print(e)
+                            pass
+        except Exception as e:
+            warning(f"Error reading progress file: {e}")
+            
+    def _save_progress(self, line):
+        """Save current progress to temporary file"""
+        if not self.progress_file:
+            return
+            
+        try:
+            with open(self.progress_file, 'w') as f:
+                json.dump({
+                    'line': line, 
+                    'input_file': self.input_file
+                }, f)
+        except Exception as e:
+            warning_with_progress(f"Failed to save progress: {e}")
+            
+    def _clear_progress(self):
+        """Clear the progress file on successful completion"""
+        if self.progress_file and os.path.exists(self.progress_file):
+            try:
+                os.remove(self.progress_file)
+            except Exception as e:
+                warning(f"Failed to remove progress file: {e}")
 
     def getmodels(self):
         """Get available Gemini models that support content generation."""
         if not self.current_api_key:
-            print("Please provide a valid Gemini API key.")
+            error("Please provide a valid Gemini API key.")
             exit(0)
 
         genai.configure(api_key=self.current_api_key)
@@ -78,15 +163,15 @@ class GeminiSRTTranslator:
         and writes the translated subtitles to the output file.
         """
         if not self.current_api_key:
-            print("Please provide a valid Gemini API key.")
+            error("Please provide a valid Gemini API key.")
             exit(0)
         
         if not self.target_language:
-            print("Please provide a target language.")
+            error("Please provide a target language.")
             exit(0)
         
         if not self.input_file:
-            print("Please provide a subtitle file.")
+            error("Please provide a subtitle file.")
             exit(0)
         
         if not self.output_file:
@@ -115,7 +200,7 @@ Dialogs must be translated as they are without any changes.
         model = self._get_model(instruction)
 
         if self.model_name not in models:
-            print(f"Model {self.model_name} is not available. Please choose a different model.")
+            error(f"Model {self.model_name} is not available. Please choose a different model.")
             exit(0)
 
         with open(self.input_file, "r", encoding="utf-8") as original_file:
@@ -124,29 +209,29 @@ Dialogs must be translated as they are without any changes.
             try:
                 translated_file_exists = open(self.output_file, "r", encoding="utf-8")
                 translated_subtitle = list(srt.parse(translated_file_exists.read()))
-                print(f"Translated file {self.output_file} already exists. Loading existing translation...\n")
                 if self.start_line == 1:
+                    info(f"Translated file {self.output_file} already exists. Loading existing translation...\n")
                     while True:
                         try:
-                            self.start_line = int(input(f"Enter the line number to start from (1 to {len(original_subtitle)}): ").strip())
+                            self.start_line = int(input_prompt(f"Enter the line number to start from (1 to {len(original_subtitle)}): ").strip())
                             if self.start_line < 1 or self.start_line > len(original_subtitle):
-                                print(f"Line number must be between 1 and {len(original_subtitle)}. Please try again.")
+                                warning(f"Line number must be between 1 and {len(original_subtitle)}. Please try again.")
                                 continue
                             break
                         except ValueError:
-                            print("Invalid input. Please enter a valid number.")
+                            warning("Invalid input. Please enter a valid number.")
 
             except FileNotFoundError:
                 translated_subtitle = original_subtitle.copy()
             
             if len(original_subtitle) != len(translated_subtitle):
-                print(f"Number of line of existing translated file does not match the number of lines in the original file.")
+                error(f"Number of line of existing translated file does not match the number of lines in the original file.")
                 exit(0)
 
             translated_file = open(self.output_file, "w", encoding="utf-8")
 
             if self.start_line > len(original_subtitle) or self.start_line < 1:
-                print(f"Start line must be between 1 and {len(original_subtitle)}. Please check the input file.")
+                error(f"Start line must be between 1 and {len(original_subtitle)}. Please check the input file.")
                 exit(0)
             
             i = self.start_line - 1
@@ -165,27 +250,32 @@ Dialogs must be translated as they are without any changes.
             if 'pro' in self.model_name and self.free_quota:
                 delay = True
                 if not self.gemini_api_key2:
-                    print("Pro model and free user quota detected, enabling 30s delay between requests...\n")
+                    info("Pro model and free user quota detected, enabling 30s delay between requests...\n")
                 else:
                     delay_time = 15
-                    print("\033[36mPro model and free user quota detected, using secondary API key for additional quota...\033[0m")
+                    info("Pro model and free user quota detected, using secondary API key for additional quota...\n")
                     print()
 
             batch.append(SubtitleObject(index=str(i), content=original_subtitle[i].content))
             i += 1
 
-            print(f"\033[95mStarting translation of {total - self.start_line + 1} lines...\033[0m\n")
+            highlight(f"Starting translation of {total - self.start_line + 1} lines...\n")
+            progress_bar(i, total, prefix="Translating:", suffix=f"{self.model_name}")
 
             if self.gemini_api_key2:
-                print(f"\033[96mStarting with API Key {self.current_api_number}\033[0m\n")
+                info(f"Starting with API Key {self.current_api_number}\n")
 
             def handle_interrupt(signal_received, frame):
-                print("\nTranslation interrupted. Saving partial results to file. Retry starting from line {}.".format(i - self.batch_size + 1))
+                warning_with_progress(f"Translation interrupted. Saving partial results to file. Progress saved.")
                 if translated_file:
                     translated_file.write(srt.compose(translated_subtitle))
+                self._save_progress(i - len(batch) + 1)
                 exit(0)
 
             signal.signal(signal.SIGINT, handle_interrupt)
+            
+            # Save initial progress
+            self._save_progress(i + 1)
 
             while len(batch) > 0:
                 if i < total and len(batch) < self.batch_size:
@@ -196,13 +286,19 @@ Dialogs must be translated as they are without any changes.
                     start_time = time.time()
                     previous_message = self._process_batch(model, batch, previous_message, translated_subtitle)
                     end_time = time.time()
-                    print(f"\033[93mTranslated {i}/{total}\033[0m")
+                    
+                    # Update progress bar
+                    progress_bar(i, total, prefix="Translating:", suffix=f"{self.model_name}")
+                    
+                    # Save progress after each batch
+                    self._save_progress(i)
+                    
                     if delay and (end_time - start_time < delay_time) and i < total:
                         time.sleep(30 - (end_time - start_time))
                     if reverted > 0:
                         self.batch_size += reverted
                         reverted = 0
-                        print("\nIncreasing batch size back to {}...\n".format(self.batch_size))
+                        info_with_progress(f"Increasing batch size back to {self.batch_size}...")
                     if i < total and len(batch) < self.batch_size:
                         batch.append(SubtitleObject(index=str(i), content=original_subtitle[i].content))
                         i += 1
@@ -211,15 +307,17 @@ Dialogs must be translated as they are without any changes.
                     
                     if "quota" in e_str:
                         if self._switch_api():
-                            print(f"\n🔄 \033[96mAPI {self.backup_api_number} quota exceeded! Switching to API {self.current_api_number}...\033[0m\n")
+                            highlight_with_progress(f"🔄 API {self.backup_api_number} quota exceeded! Switching to API {self.current_api_number}...")
                             model = self._get_model(instruction)
                         else:
-                            print("\n\033[91mAll API quotas exceeded, waiting 1 minute...\033[0m\n")
+                            warning_with_progress("All API quotas exceeded, waiting 1 minute...")
                             time.sleep(60)
                     else:
                         if self.batch_size == 1:
                             translated_file.write(srt.compose(translated_subtitle))
-                            print("\n\033[31mTranslation failed. Saving partial results to file. Retry starting from line {}.\033[0m".format(i + 1))
+                            # Save progress before exiting
+                            self._save_progress(i + 1)
+                            error_with_progress(f"Translation failed. Saving partial results to file. Progress saved.")
                             exit(0)
                         if self.batch_size > 1:
                             decrement = min(10, self.batch_size - 1)
@@ -229,13 +327,16 @@ Dialogs must be translated as they are without any changes.
                                 batch.pop()
                             self.batch_size -= decrement
                         if "Gemini" in e_str:
-                            print("\n{}".format(e_str))
+                            error_with_progress(f"{e_str}")
                         else:
-                            print("\nAn unexpected error has occurred: {}".format(e_str))
-                        print("Decreasing batch size to {} and trying again...\n".format(self.batch_size))
+                            error_with_progress(f"An unexpected error has occurred: {e_str}")
+                        warning_with_progress(f"Decreasing batch size to {self.batch_size} and trying again...")
                 
-            print("\n\033[92mTranslation completed successfully!\033[0m\n")
+            success_with_progress("Translation completed successfully!")
             translated_file.write(srt.compose(translated_subtitle))
+            
+            # Clear progress file on successful completion
+            self._clear_progress()
 
     def _switch_api(self) -> bool:
         """
