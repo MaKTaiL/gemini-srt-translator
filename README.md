@@ -55,7 +55,8 @@ This will translate the subtitles in the `subtitle.srt` file to French.
 
 ### Resuming Partial Translation
 
-If you want to resume a partial translation (due to interruption or failure), you can simply re-run the script with the same parameters. GST will automatically detect the existence of a partially translated file and prompt which line to start from.
+If you want to resume a partial translation (due to interruption or failure), you can simply re-run the script with the same parameters. GST will automatically detect the existence of a partially translated file and prompt if you want to resume.
+
 You can also specify the `start_line` parameter directly in the script and skip the prompt:
 
 ```python
@@ -81,6 +82,7 @@ You can further customize the translation settings by providing optional paramet
 - `batch_size`: Batch size for translation. (default: 30)
 - `free_quota`: Use free quota for translation (default: True).
 - `skip_upgrade`: Skip version upgrade check (default: False).
+- `use_colors`: Use colors in the console output (default: True).
 
 Example:
 

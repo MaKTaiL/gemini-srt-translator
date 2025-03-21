@@ -1,6 +1,7 @@
 # GST Files
 *.srt
 traduzir.py
+*.progress
 
 # Virtual environment
 venv/
