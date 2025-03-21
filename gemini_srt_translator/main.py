@@ -92,7 +92,10 @@ class GeminiSRTTranslator:
         """Check if there's a saved progress file and load it if exists"""
         if not self.progress_file or not os.path.exists(self.progress_file):
             return
-            
+        
+        if self.start_line != 1:
+            return
+        
         try:
             with open(self.progress_file, 'r') as f:
                 data = json.load(f)
