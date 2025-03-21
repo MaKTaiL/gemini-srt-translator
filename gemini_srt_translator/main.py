@@ -256,17 +256,17 @@ Dialogs must be translated as they are without any changes.
                     info("Pro model and free user quota detected, enabling 30s delay between requests...\n")
                 else:
                     delay_time = 15
-                    info("Pro model and free user quota detected, using secondary API key for additional quota...\n")
+                    info("\033[36mPro model and free user quota detected, using secondary API key for additional quota...\033[0m\n")
                     print()
 
             batch.append(SubtitleObject(index=str(i), content=original_subtitle[i].content))
             i += 1
 
-            highlight(f"Starting translation of {total - self.start_line + 1} lines...\n")
-            progress_bar(i, total, prefix="Translating:", suffix=f"{self.model_name}")
+            highlight(f"\033[95mStarting translation of {total - self.start_line + 1} lines...\033[0m\n")
+            progress_bar(i, total, prefix="\033[33mTranslating:", suffix=f"\033[32m{self.model_name} \033[0m")
 
             if self.gemini_api_key2:
-                info(f"Starting with API Key {self.current_api_number}\n")
+                info(f"\033[96mStarting with API Key {self.current_api_number}\033[0m\n")
 
             def handle_interrupt(signal_received, frame):
                 warning_with_progress(f"Translation interrupted. Saving partial results to file. Progress saved.")
@@ -291,7 +291,7 @@ Dialogs must be translated as they are without any changes.
                     end_time = time.time()
                     
                     # Update progress bar
-                    progress_bar(i, total, prefix="Translating:", suffix=f"{self.model_name}")
+                    progress_bar(i, total, prefix="\033[33mTranslating:", suffix=f"\033[32m{self.model_name} \033[0m")
                     
                     # Save progress after each batch
                     self._save_progress(i)
@@ -310,17 +310,17 @@ Dialogs must be translated as they are without any changes.
                     
                     if "quota" in e_str:
                         if self._switch_api():
-                            highlight_with_progress(f"🔄 API {self.backup_api_number} quota exceeded! Switching to API {self.current_api_number}...")
+                            highlight_with_progress(f"🔄 \033[96mAPI {self.backup_api_number} quota exceeded! Switching to API {self.current_api_number}...\033[0m")
                             model = self._get_model(instruction)
                         else:
-                            warning_with_progress("All API quotas exceeded, waiting 1 minute...")
+                            warning_with_progress("\033[91mAll API quotas exceeded, waiting 1 minute...\033[0m")
                             time.sleep(60)
                     else:
                         if self.batch_size == 1:
                             translated_file.write(srt.compose(translated_subtitle))
                             # Save progress before exiting
                             self._save_progress(i + 1)
-                            error_with_progress(f"Translation failed. Saving partial results to file. Progress saved.")
+                            error_with_progress(f"\033[31mTranslation failed. Saving partial results to file. Progress saved.\033[0m")
                             exit(0)
                         if self.batch_size > 1:
                             decrement = min(10, self.batch_size - 1)
@@ -335,7 +335,7 @@ Dialogs must be translated as they are without any changes.
                             error_with_progress(f"An unexpected error has occurred: {e_str}")
                         warning_with_progress(f"Decreasing batch size to {self.batch_size} and trying again...")
                 
-            success_with_progress("Translation completed successfully!")
+            success_with_progress("\n\033[92mTranslation completed successfully!\033[92m\n")
             translated_file.write(srt.compose(translated_subtitle))
             
             # Clear progress file on successful completion
