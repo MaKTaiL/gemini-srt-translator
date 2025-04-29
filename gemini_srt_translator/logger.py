@@ -161,6 +161,9 @@ def progress_bar(current: int, total: int, bar_length: int = 30, prefix: str = "
     sys.stdout.write(progress_text)
     sys.stdout.write("\n\n")
 
+    if len(_previous_messages) > 0 and "waiting" in _previous_messages[-1]["message"].lower():
+        _previous_messages.pop()
+
     for i in range(len(_previous_messages)):
         if _use_colors and Color.supports_color():
             color_code = _previous_messages[i]["color"].value if _previous_messages[i]["color"] else Color.YELLOW.value

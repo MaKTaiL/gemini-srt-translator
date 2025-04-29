@@ -228,7 +228,7 @@ Dialogs must be translated as they are without any changes.
                 translated_subtitle = original_subtitle.copy()
             
             if len(original_subtitle) != len(translated_subtitle):
-                error(f"Number of line of existing translated file does not match the number of lines in the original file.")
+                error(f"Number of lines of existing translated file does not match the number of lines in the original file.")
                 exit(0)
 
             translated_file = open(self.output_file, "w", encoding="utf-8")
@@ -257,16 +257,16 @@ Dialogs must be translated as they are without any changes.
                 else:
                     delay_time = 15
                     info("Pro model and free user quota detected, using secondary API key for additional quota...\n")
-                    print()
 
-            batch.append(SubtitleObject(index=str(i), content=original_subtitle[i].content))
-            i += 1
 
             highlight(f"Starting translation of {total - self.start_line + 1} lines...\n")
             progress_bar(i, total, prefix="Translating:", suffix=f"{self.model_name}")
 
+            batch.append(SubtitleObject(index=str(i), content=original_subtitle[i].content))
+            i += 1
+            
             if self.gemini_api_key2:
-                info(f"Starting with API Key {self.current_api_number}\n")
+                info_with_progress(f"Starting with API Key {self.current_api_number}")
 
             def handle_interrupt(signal_received, frame):
                 warning_with_progress(f"Translation interrupted. Saving partial results to file. Progress saved.")
@@ -280,6 +280,7 @@ Dialogs must be translated as they are without any changes.
             # Save initial progress
             self._save_progress(i + 1)
 
+            last_time = 0
             while len(batch) > 0:
                 if i < total and len(batch) < self.batch_size:
                     batch.append(SubtitleObject(index=str(i), content=original_subtitle[i].content))
@@ -309,12 +310,15 @@ Dialogs must be translated as they are without any changes.
                     e_str = str(e)
                     
                     if "quota" in e_str:
-                        if self._switch_api():
-                            highlight_with_progress(f"🔄 API {self.backup_api_number} quota exceeded! Switching to API {self.current_api_number}...")
+                        current_time = time.time()
+                        if current_time - last_time > 60 and self._switch_api():
+                            highlight_with_progress(f"API {self.backup_api_number} quota exceeded! Switching to API {self.current_api_number}...")
                             model = self._get_model(instruction)
                         else:
-                            warning_with_progress("All API quotas exceeded, waiting 1 minute...")
-                            time.sleep(60)
+                            for j in range(60, 0, -1):
+                                warning_with_progress(f"All API quotas exceeded, waiting {j} seconds...")
+                                time.sleep(1)
+                        last_time = current_time
                     else:
                         if self.batch_size == 1:
                             translated_file.write(srt.compose(translated_subtitle))
