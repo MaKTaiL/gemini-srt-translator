@@ -1,14 +1,16 @@
-import sys
 import os
 import shutil
+import sys
 from enum import Enum
 from typing import Any, Optional
 
 # Global variable to control color output
 _use_colors = True
 
+
 class Color(Enum):
     """ANSI color codes"""
+
     RESET = "\033[0m"
     BLACK = "\033[30m"
     RED = "\033[31m"
@@ -20,34 +22,36 @@ class Color(Enum):
     WHITE = "\033[37m"
     BOLD = "\033[1m"
     UNDERLINE = "\033[4m"
-    
+
     @staticmethod
     def supports_color() -> bool:
         """Check if the terminal supports color output"""
         # If the NO_COLOR env var is set, then we shouldn't use color
-        if os.environ.get('NO_COLOR', '') != '':
+        if os.environ.get("NO_COLOR", "") != "":
             return False
-        
+
         # If the FORCE_COLOR env var is set, then we should use color
-        if os.environ.get('FORCE_COLOR', '') != '':
+        if os.environ.get("FORCE_COLOR", "") != "":
             return True
-        
+
         # isatty is not always implemented
-        is_a_tty = hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
-        
+        is_a_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+
         # Windows has specific checks for color support
-        if sys.platform == 'win32':
-            return is_a_tty and ('ANSICON' in os.environ or 
-                               'WT_SESSION' in os.environ or 
-                               os.environ.get('TERM_PROGRAM') == 'vscode')
-        
+        if sys.platform == "win32":
+            return is_a_tty and (
+                "ANSICON" in os.environ or "WT_SESSION" in os.environ or os.environ.get("TERM_PROGRAM") == "vscode"
+            )
+
         # For all other platforms, assume color support if it's a TTY
         return is_a_tty
+
 
 def set_color_mode(enabled: bool) -> None:
     """Set whether to use colors in output"""
     global _use_colors
     _use_colors = enabled
+
 
 def info(message: Any) -> None:
     """Print an information message in cyan color"""
@@ -56,12 +60,14 @@ def info(message: Any) -> None:
     else:
         print(message)
 
+
 def warning(message: Any) -> None:
     """Print a warning message in yellow color"""
     if _use_colors and Color.supports_color():
         print(f"{Color.YELLOW.value}{message}{Color.RESET.value}")
     else:
         print(message)
+
 
 def error(message: Any) -> None:
     """Print an error message in red color"""
@@ -70,12 +76,14 @@ def error(message: Any) -> None:
     else:
         print(message)
 
+
 def success(message: Any) -> None:
     """Print a success message in green color"""
     if _use_colors and Color.supports_color():
         print(f"{Color.GREEN.value}{message}{Color.RESET.value}")
     else:
         print(message)
+
 
 def progress(message: Any) -> None:
     """Print a progress/status update message in blue color"""
@@ -84,12 +92,14 @@ def progress(message: Any) -> None:
     else:
         print(message)
 
+
 def highlight(message: Any) -> None:
     """Print an important message in magenta color"""
     if _use_colors and Color.supports_color():
         print(f"{Color.MAGENTA.value}{Color.BOLD.value}{message}{Color.RESET.value}")
     else:
         print(message)
+
 
 def input_prompt(message: Any) -> str:
     """Display a colored input prompt and return user input"""
@@ -98,15 +108,26 @@ def input_prompt(message: Any) -> str:
     else:
         return input(message)
 
+
 # Store the last progress bar state for message updates
 _last_progress = {"current": 0, "total": 0, "prefix": "", "suffix": "", "bar_length": 30}
 _has_started = False
 _previous_messages = []
 
-def progress_bar(current: int, total: int, bar_length: int = 30, prefix: str = "", suffix: str = "", message: str = "", message_color: Color = None) -> None:
+
+def progress_bar(
+    current: int,
+    total: int,
+    bar_length: int = 30,
+    prefix: str = "",
+    suffix: str = "",
+    message: str = "",
+    message_color: Color = None,
+    isPrompt: bool = False,
+) -> None:
     """
     Display a colored progress bar with an optional message underneath
-    
+
     Args:
         current: Current progress value
         total: Total value for 100% completion
@@ -117,31 +138,25 @@ def progress_bar(current: int, total: int, bar_length: int = 30, prefix: str = "
         message_color: Color to use for the message
     """
     global _last_progress, _has_started, _previous_messages
-    
+
     # Save the current state for message updates
-    _last_progress = {
-        "current": current,
-        "total": total,
-        "bar_length": bar_length,
-        "prefix": prefix,
-        "suffix": suffix
-    }
-    
+    _last_progress = {"current": current, "total": total, "bar_length": bar_length, "prefix": prefix, "suffix": suffix}
+
     # Get terminal width
     terminal_width = shutil.get_terminal_size().columns
-    
+
     # Create the progress bar
     progress_ratio = current / total if total > 0 else 0
     filled_length = int(bar_length * progress_ratio)
     bar = "█" * filled_length + "░" * (bar_length - filled_length)
     percentage = int(100 * progress_ratio)
-    
+
     # Format the progress bar line
     if suffix:
         progress_text = f"{prefix} |{bar}| {percentage}% ({current}/{total}) {suffix}"
     else:
         progress_text = f"{prefix} |{bar}| {percentage}% ({current}/{total})"
-    
+
     # Handle the clearing of lines based on whether we've shown a message
 
     if _has_started:
@@ -152,12 +167,14 @@ def progress_bar(current: int, total: int, bar_length: int = 30, prefix: str = "
         sys.stdout.write("\033[F" + " " * terminal_width + "\r")
     else:
         _has_started = True
-    
+
     # Apply colors if enabled
     if _use_colors and Color.supports_color():
         colored_bar = bar.replace("█", f"{Color.GREEN.value}█{Color.BLUE.value}")
-        progress_text = f"{Color.BLUE.value}{prefix} |{colored_bar}| {percentage}% ({current}/{total}) {suffix}{Color.RESET.value}"
-    
+        progress_text = (
+            f"{Color.BLUE.value}{prefix} |{colored_bar}| {percentage}% ({current}/{total}) {suffix}{Color.RESET.value}"
+        )
+
     sys.stdout.write(progress_text)
     sys.stdout.write("\n\n")
 
@@ -171,33 +188,52 @@ def progress_bar(current: int, total: int, bar_length: int = 30, prefix: str = "
         else:
             sys.stdout.write(_previous_messages[i]["message"] + "\n")
     if message:
-        _previous_messages.append({
-            "message": message,
-            "color": message_color
-        })
         if _use_colors and Color.supports_color():
             color_code = message_color.value if message_color else Color.YELLOW.value
-            sys.stdout.write(f"{color_code}{message}{Color.RESET.value}")
+            if isPrompt:
+                sys.stdout.write(f"{color_code}{Color.BOLD.value}{message}{Color.RESET.value}")
+                user_prompt = input()
+                sys.stdout.write("\033[F" + " " * terminal_width + "\r")
+            else:
+                _previous_messages.append({"message": message, "color": message_color})
+                sys.stdout.write(f"{color_code}{message}{Color.RESET.value}")
         else:
-            sys.stdout.write(message)
+            if isPrompt:
+                sys.stdout.write(message)
+                user_prompt = input()
+                sys.stdout.write("\033[F" + " " * terminal_width + "\r")
+            else:
+                _previous_messages.append({"message": message, "color": message_color})
+                sys.stdout.write(message)
     sys.stdout.flush()
+    return user_prompt if isPrompt else None
+
 
 def info_with_progress(message: Any) -> None:
     """Update the progress bar with an info message"""
     progress_bar(**_last_progress, message=message, message_color=Color.CYAN)
 
+
 def warning_with_progress(message: Any) -> None:
     """Update the progress bar with a warning message"""
     progress_bar(**_last_progress, message=message, message_color=Color.YELLOW)
+
 
 def error_with_progress(message: Any) -> None:
     """Update the progress bar with an error message"""
     progress_bar(**_last_progress, message=message, message_color=Color.RED)
 
+
 def success_with_progress(message: Any) -> None:
     """Update the progress bar with a success message"""
     progress_bar(**_last_progress, message=message, message_color=Color.GREEN)
 
+
 def highlight_with_progress(message: Any) -> None:
     """Update the progress bar with a highlighted message"""
     progress_bar(**_last_progress, message=message, message_color=Color.MAGENTA)
+
+
+def input_prompt_with_progress(message: Any) -> str:
+    """Update the progress bar with an input prompt message"""
+    return progress_bar(**_last_progress, message=message, message_color=Color.WHITE, isPrompt=True)
