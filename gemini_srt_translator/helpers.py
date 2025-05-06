@@ -1,7 +1,7 @@
 from google.genai.types import HarmBlockThreshold, HarmCategory, SafetySetting
 
 
-def get_instruction(language: str) -> str:
+def get_instruction(language: str, description: str) -> str:
     """
     Get the instruction for the translation model based on the target language.
     """
@@ -20,6 +20,8 @@ The 'content' key is the dialog to be translated.
 The indices must remain the same in the response as in the request.
 Dialogs must be translated as they are without any changes.
 """
+    if description:
+        instruction += "\nAdditional user instruction: '" + description + "'"
     return instruction
 
 

@@ -104,7 +104,7 @@ class GeminiSRTTranslator:
         self.config = types.GenerateContentConfig(
             response_mime_type="application/json",
             safety_settings=get_safety_settings(),
-            system_instruction=get_instruction(target_language),
+            system_instruction=get_instruction(target_language, description),
         )
 
         # Set color mode based on user preference
@@ -207,9 +207,6 @@ class GeminiSRTTranslator:
 
         if not self.output_file:
             self.output_file = ".".join(self.input_file.split(".")[:-1]) + "_translated.srt"
-
-        if self.description:
-            instruction += "\nAdditional user instruction: '" + self.description + "'"
 
         models = self.getmodels()
 
