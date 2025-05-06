@@ -95,11 +95,12 @@ gst.target_language = "French"
 gst.input_file = "subtitle.srt"
 gst.output_file = "subtitle_translated.srt"
 gst.start_line = 20
-gst.description = "Translation of a medical television series, use medical terms"
+gst.description = "Medical television series, use medical terms"
 gst.model_name = "gemini-2.0-flash"
-gst.batch_size = 30
-gst.free_quota = True
+gst.batch_size = 50
+gst.free_quota = False
 gst.skip_upgrade = True
+gst.use_colors = False
 
 gst.translate()
 ```
