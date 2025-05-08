@@ -16,7 +16,7 @@
     gst.translate()
     ```
     This will translate the subtitles in the `subtitle.srt` file to French.
-    
+
 ### List Models
     You can list the available models using the `listmodels` command:
     ```
@@ -42,8 +42,10 @@ description: str = None
 model_name: str = None
 batch_size: int = None
 free_quota: bool = None
-skip_upgrade: bool = False
-use_colors: bool = True
+skip_upgrade: bool = None
+use_colors: bool = None
+error_log: bool = None
+
 
 def getmodels():
     """
@@ -57,7 +59,7 @@ def getmodels():
 
     # Your Gemini API key
     gst.gemini_api_key = "your_gemini_api_key_here"
-    
+
     models = gst._getmodels()
     print(models)
     ```
@@ -65,8 +67,9 @@ def getmodels():
     Raises:
         Exception: If the Gemini API key is not provided.
     """
-    translator = GeminiSRTTranslator(gemini_api_key = gemini_api_key)
+    translator = GeminiSRTTranslator(gemini_api_key=gemini_api_key)
     return translator.getmodels()
+
 
 def listmodels():
     """
@@ -80,14 +83,14 @@ def listmodels():
 
     # Your Gemini API key
     gst.gemini_api_key = "your_gemini_api_key_here"
-    
+
     gst.listmodels()
     ```
 
     Raises:
         Exception: If the Gemini API key is not provided.
     """
-    translator = GeminiSRTTranslator(gemini_api_key = gemini_api_key)
+    translator = GeminiSRTTranslator(gemini_api_key=gemini_api_key)
     models = translator.getmodels()
     if models:
         print("Available models:\n")
@@ -95,6 +98,7 @@ def listmodels():
             print(model)
     else:
         print("No models available or an error occurred while fetching models.")
+
 
 def translate():
     """
@@ -143,6 +147,9 @@ def translate():
     # (Optional) Use colors in the output (default: True)
     gst.use_colors = True
 
+    # (Optional) Enable error logging (default: False)
+    gst.error_log = True
+
     gst.translate()
     ```
     Raises:
@@ -151,22 +158,23 @@ def translate():
         Exception: If the subtitle file is not provided.
     """
     params = {
-        'gemini_api_key': gemini_api_key,
-        'gemini_api_key2': gemini_api_key2,
-        'target_language': target_language,
-        'input_file': input_file,
-        'output_file': output_file,
-        'start_line': start_line,
-        'description': description,
-        'model_name': model_name,
-        'batch_size': batch_size,
-        'free_quota': free_quota,
-        'use_colors': use_colors
+        "gemini_api_key": gemini_api_key,
+        "gemini_api_key2": gemini_api_key2,
+        "target_language": target_language,
+        "input_file": input_file,
+        "output_file": output_file,
+        "start_line": start_line,
+        "description": description,
+        "model_name": model_name,
+        "batch_size": batch_size,
+        "free_quota": free_quota,
+        "use_colors": use_colors,
+        "error_log": error_log,
     }
 
     if not skip_upgrade:
         upgrade_package("gemini-srt-translator", use_colors=use_colors)
-    
+
     # Filter out None values
     filtered_params = {k: v for k, v in params.items() if v is not None}
     translator = GeminiSRTTranslator(**filtered_params)

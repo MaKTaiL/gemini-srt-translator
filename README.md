@@ -1,8 +1,8 @@
 # Gemini SRT Translator
 
 [![PyPI version](https://img.shields.io/pypi/v/gemini-srt-translator)](https://pypi.org/project/gemini-srt-translator)
-![Python support](https://img.shields.io/pypi/pyversions/gemini-srt-translator)
-![Downloads](https://img.shields.io/pypi/dw/gemini-srt-translator)
+[![Python support](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FMaKTaiL%2Fgemini-srt-translator%2Frefs%2Fheads%2Fmain%2Fpyproject.toml)](https://pypi.org/project/gemini-srt-translator)
+[![Downloads](https://img.shields.io/pypi/dw/gemini-srt-translator)](https://pypi.org/project/gemini-srt-translator)
 
 ## Overview
 
@@ -83,6 +83,7 @@ You can further customize the translation settings by providing optional paramet
 - `free_quota`: Use free quota for translation (default: True).
 - `skip_upgrade`: Skip version upgrade check (default: False).
 - `use_colors`: Use colors in the console output (default: True).
+- `error_log`: Enable error logging (default: False).
 
 Example:
 
@@ -101,6 +102,7 @@ gst.batch_size = 50
 gst.free_quota = False
 gst.skip_upgrade = True
 gst.use_colors = False
+gst.error_log = True
 
 gst.translate()
 ```
