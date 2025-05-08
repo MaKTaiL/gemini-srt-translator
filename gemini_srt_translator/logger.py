@@ -6,6 +6,8 @@ from typing import Any, Optional
 
 # Global variable to control color output
 _use_colors = True
+_loading_bars = ["—", "\\", "|", "/"]
+_loading_bars_index = -1
 
 
 class Color(Enum):
@@ -110,9 +112,10 @@ def input_prompt(message: Any) -> str:
 
 
 # Store the last progress bar state for message updates
-_last_progress = {"current": 0, "total": 0, "prefix": "", "suffix": "", "bar_length": 30}
+_last_progress = None
 _has_started = False
 _previous_messages = []
+_last_chunk_size = 0
 
 
 def progress_bar(
@@ -124,6 +127,9 @@ def progress_bar(
     message: str = "",
     message_color: Color = None,
     isPrompt: bool = False,
+    isLoading: bool = False,
+    isSending: bool = False,
+    chunk_size: int = 0,
 ) -> None:
     """
     Display a colored progress bar with an optional message underneath
@@ -137,25 +143,35 @@ def progress_bar(
         message: Optional message to display below the progress bar
         message_color: Color to use for the message
     """
-    global _last_progress, _has_started, _previous_messages
+    global _last_progress, _has_started, _previous_messages, _loading_bars_index, _last_chunk_size
 
     # Save the current state for message updates
-    _last_progress = {"current": current, "total": total, "bar_length": bar_length, "prefix": prefix, "suffix": suffix}
+    _last_progress = {
+        "current": current,
+        "total": total,
+        "bar_length": bar_length,
+        "prefix": prefix,
+        "suffix": suffix,
+    }
+
+    _last_chunk_size = chunk_size
 
     # Get terminal width
     terminal_width = shutil.get_terminal_size().columns
 
     # Create the progress bar
-    progress_ratio = current / total if total > 0 else 0
+    progress_ratio = (current + chunk_size) / total if total > 0 else 0
     filled_length = int(bar_length * progress_ratio)
     bar = "█" * filled_length + "░" * (bar_length - filled_length)
     percentage = int(100 * progress_ratio)
-
+    progress_text = f"{prefix} |{bar}| {percentage}% ({current + chunk_size}/{total})"
     # Format the progress bar line
     if suffix:
-        progress_text = f"{prefix} |{bar}| {percentage}% ({current}/{total}) {suffix}"
-    else:
-        progress_text = f"{prefix} |{bar}| {percentage}% ({current}/{total})"
+        progress_text = f"{progress_text} {suffix}"
+    if isLoading:
+        progress_text = f"{progress_text} | Processing {_loading_bars[_loading_bars_index]}"
+    elif current < total and isSending:
+        progress_text = f"{progress_text} | Sending batch ↑↑↑"
 
     # Handle the clearing of lines based on whether we've shown a message
 
@@ -170,10 +186,13 @@ def progress_bar(
 
     # Apply colors if enabled
     if _use_colors and Color.supports_color():
-        colored_bar = bar.replace("█", f"{Color.GREEN.value}█{Color.BLUE.value}")
-        progress_text = (
-            f"{Color.BLUE.value}{prefix} |{colored_bar}| {percentage}% ({current}/{total}) {suffix}{Color.RESET.value}"
-        )
+        progress_text = progress_text.replace("█", f"{Color.GREEN.value}█{Color.BLUE.value}")
+        progress_text = progress_text.replace("↑", f"{Color.GREEN.value}↑{Color.BLUE.value}")
+        for i in range(len(_loading_bars)):
+            progress_text = progress_text.replace(
+                _loading_bars[i], f"{Color.GREEN.value}{_loading_bars[i]}{Color.BLUE.value}"
+            )
+        progress_text = f"{Color.BLUE.value}{progress_text}{Color.RESET.value}"
 
     sys.stdout.write(progress_text)
     sys.stdout.write("\n\n")
@@ -196,7 +215,7 @@ def progress_bar(
                 sys.stdout.write("\033[F" + " " * terminal_width + "\r")
             else:
                 _previous_messages.append({"message": message, "color": message_color})
-                sys.stdout.write(f"{color_code}{message}{Color.RESET.value}")
+                sys.stdout.write(f"{color_code}{message}{Color.RESET.value}" + "\n")
         else:
             if isPrompt:
                 sys.stdout.write(message)
@@ -204,36 +223,56 @@ def progress_bar(
                 sys.stdout.write("\033[F" + " " * terminal_width + "\r")
             else:
                 _previous_messages.append({"message": message, "color": message_color})
-                sys.stdout.write(message)
+                sys.stdout.write(message + "\n")
     sys.stdout.flush()
     return user_prompt if isPrompt else None
 
 
-def info_with_progress(message: Any) -> None:
+def info_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
     """Update the progress bar with an info message"""
-    progress_bar(**_last_progress, message=message, message_color=Color.CYAN)
+    progress_bar(
+        **_last_progress, message=message, message_color=Color.CYAN, chunk_size=chunk_size, isSending=isSending
+    )
 
 
-def warning_with_progress(message: Any) -> None:
+def warning_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
     """Update the progress bar with a warning message"""
-    progress_bar(**_last_progress, message=message, message_color=Color.YELLOW)
+    progress_bar(
+        **_last_progress, message=message, message_color=Color.YELLOW, chunk_size=chunk_size, isSending=isSending
+    )
 
 
-def error_with_progress(message: Any) -> None:
+def error_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
     """Update the progress bar with an error message"""
-    progress_bar(**_last_progress, message=message, message_color=Color.RED)
+    progress_bar(**_last_progress, message=message, message_color=Color.RED, chunk_size=chunk_size, isSending=isSending)
 
 
-def success_with_progress(message: Any) -> None:
+def success_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
     """Update the progress bar with a success message"""
-    progress_bar(**_last_progress, message=message, message_color=Color.GREEN)
+    progress_bar(
+        **_last_progress, message=message, message_color=Color.GREEN, chunk_size=chunk_size, isSending=isSending
+    )
 
 
-def highlight_with_progress(message: Any) -> None:
+def highlight_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
     """Update the progress bar with a highlighted message"""
-    progress_bar(**_last_progress, message=message, message_color=Color.MAGENTA)
+    progress_bar(
+        **_last_progress, message=message, message_color=Color.MAGENTA, chunk_size=chunk_size, isSending=isSending
+    )
 
 
 def input_prompt_with_progress(message: Any) -> str:
     """Update the progress bar with an input prompt message"""
     return progress_bar(**_last_progress, message=message, message_color=Color.WHITE, isPrompt=True)
+
+
+def update_loading_animation(chunk_size: int = 0) -> None:
+    """Update the loading animation in the progress bar"""
+    global _loading_bars_index
+    _loading_bars_index = (_loading_bars_index + 1) % len(_loading_bars)
+    progress_bar(**_last_progress, message="", message_color=None, isLoading=True, chunk_size=chunk_size)
+
+
+def get_last_chunk_size() -> int:
+    """Get the last chunk size used in the progress bar"""
+    return _last_chunk_size

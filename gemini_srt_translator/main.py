@@ -18,6 +18,7 @@ from srt import Subtitle
 from gemini_srt_translator.logger import (
     error,
     error_with_progress,
+    get_last_chunk_size,
     highlight,
     highlight_with_progress,
     info,
@@ -27,6 +28,7 @@ from gemini_srt_translator.logger import (
     progress_bar,
     set_color_mode,
     success_with_progress,
+    update_loading_animation,
     warning,
     warning_with_progress,
 )
@@ -58,9 +60,10 @@ class GeminiSRTTranslator:
         start_line: int = 1,
         description: str = None,
         model_name: str = "gemini-2.0-flash",
-        batch_size: int = 50,
+        batch_size: int = 100,
         free_quota: bool = True,
         use_colors: bool = True,
+        error_log: bool = False,
     ):
         """
         Initialize the translator with necessary parameters.
@@ -76,7 +79,7 @@ class GeminiSRTTranslator:
             model_name (str): Gemini model to use
             batch_size (int): Number of subtitles to process in each batch
             free_quota (bool): Whether to use free quota (affects rate limiting)
-            use_colors (bool): Whether to use colored output (default: True)
+            use_colors (bool): Whether to use colored output
         """
 
         if not output_file:
@@ -99,6 +102,7 @@ class GeminiSRTTranslator:
         self.model_name = model_name
         self.batch_size = batch_size
         self.free_quota = free_quota
+        self.error_log = error_log
         self.token_limit = 0
         self.token_count = 0
         self.config = types.GenerateContentConfig(
@@ -149,7 +153,6 @@ class GeminiSRTTranslator:
                         try:
                             os.remove(self.output_file)
                         except Exception as e:
-                            print(e)
                             pass
         except Exception as e:
             warning(f"Error reading progress file: {e}")
@@ -252,14 +255,29 @@ class GeminiSRTTranslator:
             translated_file = open(self.output_file, "w", encoding="utf-8")
 
             if self.start_line > len(original_subtitle) or self.start_line < 1:
-                error(f"Start line must be between 1 and {len(original_subtitle)}. Please check the input file.")
+                error(f"Start line must be between 1 and {len(original_subtitle)}. Please try again.")
                 exit(0)
+
+            if len(original_subtitle) < self.batch_size:
+                self.batch_size = len(original_subtitle)
+
+            delay = False
+            delay_time = 30
+
+            if "pro" in self.model_name and self.free_quota:
+                delay = True
+                if not self.gemini_api_key2:
+                    info("Pro model and free user quota detected.\n")
+                else:
+                    delay_time = 15
+                    info("Pro model and free user quota detected, using secondary API key if needed.\n")
 
             i = self.start_line - 1
             total = len(original_subtitle)
             batch = []
             previous_message = None
             if self.start_line > 1:
+                start_idx = max(0, self.start_line - 1 - self.batch_size)
                 previous_message = types.Content(
                     role="model",
                     parts=[
@@ -270,27 +288,16 @@ class GeminiSRTTranslator:
                                         index=str(j),
                                         content=translated_subtitle[j].content,
                                     )
-                                    for j in range(0, self.start_line - 1)
+                                    for j in range(start_idx, self.start_line - 1)
                                 ],
                                 ensure_ascii=False,
                             )
                         )
                     ],
                 )
-            reverted = 0
-            delay = False
-            delay_time = 30
-
-            if "pro" in self.model_name and self.free_quota:
-                delay = True
-                if not self.gemini_api_key2:
-                    info("Pro model and free user quota detected, enabling 30s delay between requests...\n")
-                else:
-                    delay_time = 15
-                    info("Pro model and free user quota detected, using secondary API key for additional quota...\n")
 
             highlight(f"Starting translation of {total - self.start_line + 1} lines...\n")
-            progress_bar(i, total, prefix="Translating:", suffix=f"{self.model_name}")
+            progress_bar(i, total, prefix="Translating:", suffix=f"{self.model_name}", isSending=True)
 
             batch.append(SubtitleObject(index=str(i), content=original_subtitle[i].content))
             i += 1
@@ -299,19 +306,23 @@ class GeminiSRTTranslator:
                 info_with_progress(f"Starting with API Key {self.current_api_number}")
 
             def handle_interrupt(signal_received, frame):
-                warning_with_progress(f"Translation interrupted. Saving partial results to file. Progress saved.")
+                last_chunk_size = get_last_chunk_size()
+                warning_with_progress(
+                    f"Translation interrupted. Saving partial results to file. Progress saved.",
+                    chunk_size=max(0, last_chunk_size - 1),
+                )
                 if translated_file:
                     translated_file.write(srt.compose(translated_subtitle))
-                self._save_progress(i - len(batch) + 1)
+                self._save_progress(max(1, i - len(batch) + last_chunk_size))
                 exit(0)
 
             signal.signal(signal.SIGINT, handle_interrupt)
 
             # Save initial progress
-            self._save_progress(i + 1)
+            self._save_progress(i)
 
             last_time = 0
-            while len(batch) > 0:
+            while i < total or len(batch) > 0:
                 if i < total and len(batch) < self.batch_size:
                     batch.append(SubtitleObject(index=str(i), content=original_subtitle[i].content))
                     i += 1
@@ -344,28 +355,23 @@ class GeminiSRTTranslator:
                     end_time = time.time()
 
                     # Update progress bar
-                    progress_bar(i, total, prefix="Translating:", suffix=f"{self.model_name}")
+                    progress_bar(i, total, prefix="Translating:", suffix=f"{self.model_name}", isSending=True)
 
                     # Save progress after each batch
-                    self._save_progress(i)
+                    self._save_progress(i + 1)
 
                     if delay and (end_time - start_time < delay_time) and i < total:
-                        time.sleep(30 - (end_time - start_time))
-                    if reverted > 0:
-                        self.batch_size += reverted
-                        reverted = 0
-                        info_with_progress(f"Increasing batch size back to {self.batch_size}...")
-                    if i < total and len(batch) < self.batch_size:
-                        batch.append(SubtitleObject(index=str(i), content=original_subtitle[i].content))
-                        i += 1
+                        time.sleep(delay_time - (end_time - start_time))
                 except Exception as e:
                     e_str = str(e)
+                    last_chunk_size = get_last_chunk_size()
 
                     if "quota" in e_str:
                         current_time = time.time()
                         if current_time - last_time > 60 and self._switch_api():
                             highlight_with_progress(
-                                f"API {self.backup_api_number} quota exceeded! Switching to API {self.current_api_number}..."
+                                f"API {self.backup_api_number} quota exceeded! Switching to API {self.current_api_number}...",
+                                isSending=True,
                             )
                         else:
                             for j in range(60, 0, -1):
@@ -373,24 +379,27 @@ class GeminiSRTTranslator:
                                 time.sleep(1)
                         last_time = current_time
                     else:
-                        if self.batch_size == 1:
-                            translated_file.write(srt.compose(translated_subtitle))
-                            # Save progress before exiting
-                            self._save_progress(i + 1)
-                            error_with_progress(f"Translation failed. Saving partial results to file. Progress saved.")
-                            exit(0)
-                        if self.batch_size > 1:
-                            decrement = min(10, self.batch_size - 1)
-                            reverted += decrement
-                            for _ in range(decrement):
-                                i -= 1
-                                batch.pop()
-                            self.batch_size -= decrement
-                        if "Gemini" in e_str:
-                            error_with_progress(f"{e_str}")
-                        else:
-                            error_with_progress(f"An unexpected error has occurred: {e_str}")
-                        warning_with_progress(f"Decreasing batch size to {self.batch_size} and trying again...")
+                        i -= self.batch_size
+                        parts = []
+                        for j in range(i, max(i, i + last_chunk_size - 1)):
+                            parts.append(
+                                SubtitleObject(index=str(j), content=translated_subtitle[j].content),
+                            )
+                        previous_message = types.Content(
+                            role="model",
+                            parts=[types.Part(text=json.dumps(parts, ensure_ascii=False))],
+                        )
+                        batch = []
+                        if self.error_log:
+                            error_with_progress(f"{e_str}. Continuing...", chunk_size=max(0, last_chunk_size - 1))
+                        progress_bar(
+                            i + max(0, last_chunk_size - 1),
+                            total,
+                            prefix="Translating:",
+                            suffix=f"{self.model_name}",
+                            isSending=True,
+                        )
+                        i += last_chunk_size
 
             success_with_progress("Translation completed successfully!")
             translated_file.write(srt.compose(translated_subtitle))
@@ -466,11 +475,11 @@ class GeminiSRTTranslator:
 
         Args:
             batch (list[SubtitleObject]): Batch of subtitles to translate
-            previous_message (ContentDict): Previous message for context
+            previous_message (Content): Previous message for context
             translated_subtitle (list[Subtitle]): List to store translated subtitles
 
         Returns:
-            ContentDict: The model's response for context in next batch
+            Content: The model's response for context in next batch
         """
         client = self._get_client()
         current_message = types.Content(role="user", parts=[types.Part(text=json.dumps(batch, ensure_ascii=False))])
@@ -478,22 +487,52 @@ class GeminiSRTTranslator:
             contents = [previous_message, current_message]
         else:
             contents = [current_message]
-        response = client.models.generate_content(model=self.model_name, contents=contents, config=self.config)
-        translated_lines: list[SubtitleObject] = json_repair.loads(response.text)
+        response_text = ""
+        response = client.models.generate_content_stream(model=self.model_name, contents=contents, config=self.config)
+        for chunk in response:
+            if not chunk.text:
+                continue
+            response_text += chunk.text
+            translated_lines = json_repair.loads(response_text)
+            chunk_size = len(translated_lines)
+            self._process_translated_lines(
+                translated_lines=translated_lines,
+                translated_subtitle=translated_subtitle,
+                batch=batch,
+            )
+            update_loading_animation(chunk_size=chunk_size)
+
+        translated_lines: list[SubtitleObject] = json_repair.loads(response_text)
 
         if len(translated_lines) != len(batch):
             raise Exception("Gemini has returned the wrong number of lines.")
 
+        batch.clear()
+        return types.Content(role="model", parts=[types.Part(text=response_text)])
+
+    def _process_translated_lines(
+        self,
+        translated_lines: list[SubtitleObject],
+        translated_subtitle: list[Subtitle],
+        batch: list[SubtitleObject],
+    ):
+        """
+        Process the translated lines and update the subtitle list.
+
+        Args:
+            translated_lines (list[SubtitleObject]): List of translated lines
+            translated_subtitle (list[Subtitle]): List to store translated subtitles
+            batch (list[SubtitleObject]): Batch of subtitles to translate
+        """
         for line in translated_lines:
+            if "content" not in line or "index" not in line:
+                break
             if line["index"] not in [x["index"] for x in batch]:
                 raise Exception("Gemini has returned different indices.")
             if self._dominant_strong_direction(line["content"]) == "rtl":
                 translated_subtitle[int(line["index"])].content = f"\u202b{line['content']}\u202c"
             else:
                 translated_subtitle[int(line["index"])].content = line["content"]
-
-        batch.clear()
-        return response.candidates[0].content
 
     def _dominant_strong_direction(self, s: str) -> str:
         """
