@@ -2,12 +2,7 @@ import os
 import shutil
 import sys
 from enum import Enum
-from typing import Any, Optional
-
-# Windows-specific imports for enabling ANSI support
-if sys.platform == "win32":
-    import ctypes
-    from ctypes import wintypes
+from typing import Any
 
 # Global variable to control color output
 _use_colors = True
@@ -44,26 +39,12 @@ class Color(Enum):
         # Check if stdout is a TTY
         is_a_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
 
-        # Windows-specific checks
-        if sys.platform == "win32":
-            # Enable ANSI escape codes in Windows Command Prompt
-            try:
-                # Get the console handle
-                kernel32 = ctypes.WinDLL("kernel32")
-                hStdOut = kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
-                mode = wintypes.DWORD()
-                kernel32.GetConsoleMode(hStdOut, ctypes.byref(mode))
-                # Enable ENABLE_VIRTUAL_TERMINAL_PROCESSING (0x0004)
-                if not (mode.value & 0x0004):
-                    kernel32.SetConsoleMode(hStdOut, mode.value | 0x0004)
-            except Exception:
-                pass  # If enabling fails, fall back to checking other conditions
-
-            # Check for environments that support colors
-            return is_a_tty or "ANSICON" in os.environ or "WT_SESSION" in os.environ or os.environ.get("TERM_PROGRAM") == "vscode"
-
-        # For non-Windows platforms, assume color support if it's a TTY
-        return is_a_tty
+        return (
+            is_a_tty
+            or "ANSICON" in os.environ
+            or "WT_SESSION" in os.environ
+            or os.environ.get("TERM_PROGRAM") == "vscode"
+        )
 
 
 def set_color_mode(enabled: bool) -> None:

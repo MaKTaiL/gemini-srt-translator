@@ -493,7 +493,7 @@ class GeminiSRTTranslator:
             if not chunk.text:
                 continue
             response_text += chunk.text
-            translated_lines = json_repair.loads(response_text)
+            translated_lines = json_repair.loads(response_text, stream_stable=True)
             chunk_size = len(translated_lines)
             self._process_translated_lines(
                 translated_lines=translated_lines,
@@ -501,8 +501,6 @@ class GeminiSRTTranslator:
                 batch=batch,
             )
             update_loading_animation(chunk_size=chunk_size)
-
-        translated_lines: list[SubtitleObject] = json_repair.loads(response_text)
 
         if len(translated_lines) != len(batch):
             raise Exception("Gemini has returned the wrong number of lines.")
