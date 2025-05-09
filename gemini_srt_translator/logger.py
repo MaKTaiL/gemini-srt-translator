@@ -4,6 +4,11 @@ import sys
 from enum import Enum
 from typing import Any, Optional
 
+# Windows-specific imports for enabling ANSI support
+if sys.platform == "win32":
+    import ctypes
+    from ctypes import wintypes
+
 # Global variable to control color output
 _use_colors = True
 _loading_bars = ["—", "\\", "|", "/"]
@@ -28,24 +33,36 @@ class Color(Enum):
     @staticmethod
     def supports_color() -> bool:
         """Check if the terminal supports color output"""
-        # If the NO_COLOR env var is set, then we shouldn't use color
-        if os.environ.get("NO_COLOR", "") != "":
+        # If NO_COLOR env var is set, disable color
+        if os.environ.get("NO_COLOR"):
             return False
 
-        # If the FORCE_COLOR env var is set, then we should use color
-        if os.environ.get("FORCE_COLOR", "") != "":
+        # If FORCE_COLOR env var is set, enable color
+        if os.environ.get("FORCE_COLOR"):
             return True
 
-        # isatty is not always implemented
+        # Check if stdout is a TTY
         is_a_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
 
-        # Windows has specific checks for color support
+        # Windows-specific checks
         if sys.platform == "win32":
-            return is_a_tty and (
-                "ANSICON" in os.environ or "WT_SESSION" in os.environ or os.environ.get("TERM_PROGRAM") == "vscode"
-            )
+            # Enable ANSI escape codes in Windows Command Prompt
+            try:
+                # Get the console handle
+                kernel32 = ctypes.WinDLL("kernel32")
+                hStdOut = kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
+                mode = wintypes.DWORD()
+                kernel32.GetConsoleMode(hStdOut, ctypes.byref(mode))
+                # Enable ENABLE_VIRTUAL_TERMINAL_PROCESSING (0x0004)
+                if not (mode.value & 0x0004):
+                    kernel32.SetConsoleMode(hStdOut, mode.value | 0x0004)
+            except Exception:
+                pass  # If enabling fails, fall back to checking other conditions
 
-        # For all other platforms, assume color support if it's a TTY
+            # Check for environments that support colors
+            return is_a_tty or "ANSICON" in os.environ or "WT_SESSION" in os.environ or os.environ.get("TERM_PROGRAM") == "vscode"
+
+        # For non-Windows platforms, assume color support if it's a TTY
         return is_a_tty
 
 
@@ -174,7 +191,6 @@ def progress_bar(
         progress_text = f"{progress_text} | Sending batch ↑↑↑"
 
     # Handle the clearing of lines based on whether we've shown a message
-
     if _has_started:
         sys.stdout.write(" " * terminal_width)
         for i in range(len(_previous_messages)):
