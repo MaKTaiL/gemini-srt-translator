@@ -2,7 +2,7 @@ import os
 import shutil
 import sys
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 # Global variable to control color output
 _use_colors = True
@@ -28,25 +28,23 @@ class Color(Enum):
     @staticmethod
     def supports_color() -> bool:
         """Check if the terminal supports color output"""
-        # If the NO_COLOR env var is set, then we shouldn't use color
-        if os.environ.get("NO_COLOR", "") != "":
+        # If NO_COLOR env var is set, disable color
+        if os.environ.get("NO_COLOR"):
             return False
 
-        # If the FORCE_COLOR env var is set, then we should use color
-        if os.environ.get("FORCE_COLOR", "") != "":
+        # If FORCE_COLOR env var is set, enable color
+        if os.environ.get("FORCE_COLOR"):
             return True
 
-        # isatty is not always implemented
+        # Check if stdout is a TTY
         is_a_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
 
-        # Windows has specific checks for color support
-        if sys.platform == "win32":
-            return is_a_tty and (
-                "ANSICON" in os.environ or "WT_SESSION" in os.environ or os.environ.get("TERM_PROGRAM") == "vscode"
-            )
-
-        # For all other platforms, assume color support if it's a TTY
-        return is_a_tty
+        return (
+            is_a_tty
+            or "ANSICON" in os.environ
+            or "WT_SESSION" in os.environ
+            or os.environ.get("TERM_PROGRAM") == "vscode"
+        )
 
 
 def set_color_mode(enabled: bool) -> None:
@@ -174,7 +172,6 @@ def progress_bar(
         progress_text = f"{progress_text} | Sending batch ↑↑↑"
 
     # Handle the clearing of lines based on whether we've shown a message
-
     if _has_started:
         sys.stdout.write(" " * terminal_width)
         for i in range(len(_previous_messages)):
