@@ -127,6 +127,7 @@ def progress_bar(
     isPrompt: bool = False,
     isLoading: bool = False,
     isSending: bool = False,
+    isValidating: bool = False,
     chunk_size: int = 0,
 ) -> None:
     """
@@ -168,6 +169,8 @@ def progress_bar(
         progress_text = f"{progress_text} {suffix}"
     if isLoading:
         progress_text = f"{progress_text} | Processing {_loading_bars[_loading_bars_index]}"
+    elif isValidating:
+        progress_text = f"{progress_text} | Validating results..."
     elif current < total and isSending:
         progress_text = f"{progress_text} | Sending batch ↑↑↑"
 
@@ -225,36 +228,69 @@ def progress_bar(
     return user_prompt if isPrompt else None
 
 
-def info_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
+def info_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False, isValidating: bool = False) -> None:
     """Update the progress bar with an info message"""
     progress_bar(
-        **_last_progress, message=message, message_color=Color.CYAN, chunk_size=chunk_size, isSending=isSending
+        **_last_progress,
+        message=message,
+        message_color=Color.CYAN,
+        chunk_size=chunk_size,
+        isSending=isSending,
+        isValidating=isValidating,
     )
 
 
-def warning_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
+def warning_with_progress(
+    message: Any, chunk_size: int = 0, isSending: bool = False, isValidating: bool = False
+) -> None:
     """Update the progress bar with a warning message"""
     progress_bar(
-        **_last_progress, message=message, message_color=Color.YELLOW, chunk_size=chunk_size, isSending=isSending
+        **_last_progress,
+        message=message,
+        message_color=Color.YELLOW,
+        chunk_size=chunk_size,
+        isSending=isSending,
+        isValidating=isValidating,
     )
 
 
-def error_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
+def error_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False, isValidating: bool = False) -> None:
     """Update the progress bar with an error message"""
-    progress_bar(**_last_progress, message=message, message_color=Color.RED, chunk_size=chunk_size, isSending=isSending)
+    progress_bar(
+        **_last_progress,
+        message=message,
+        message_color=Color.RED,
+        chunk_size=chunk_size,
+        isSending=isSending,
+        isValidating=isValidating,
+    )
 
 
-def success_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
+def success_with_progress(
+    message: Any, chunk_size: int = 0, isSending: bool = False, isValidating: bool = False
+) -> None:
     """Update the progress bar with a success message"""
     progress_bar(
-        **_last_progress, message=message, message_color=Color.GREEN, chunk_size=chunk_size, isSending=isSending
+        **_last_progress,
+        message=message,
+        message_color=Color.GREEN,
+        chunk_size=chunk_size,
+        isSending=isSending,
+        isValidating=isValidating,
     )
 
 
-def highlight_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
+def highlight_with_progress(
+    message: Any, chunk_size: int = 0, isSending: bool = False, isValidating: bool = False
+) -> None:
     """Update the progress bar with a highlighted message"""
     progress_bar(
-        **_last_progress, message=message, message_color=Color.MAGENTA, chunk_size=chunk_size, isSending=isSending
+        **_last_progress,
+        message=message,
+        message_color=Color.MAGENTA,
+        chunk_size=chunk_size,
+        isSending=isSending,
+        isValidating=isValidating,
     )
 
 
