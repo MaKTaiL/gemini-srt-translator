@@ -309,3 +309,33 @@ def update_loading_animation(chunk_size: int = 0) -> None:
 def get_last_chunk_size() -> int:
     """Get the last chunk size used in the progress bar"""
     return _last_chunk_size
+
+
+def save_logs_to_file() -> None:
+    """Save the current progress to a file"""
+    with open("progress.log", "w", encoding="utf-8") as f:
+        if _last_progress:
+            # Write progress information in the same format as shown in terminal
+            current = _last_progress["current"] + _last_chunk_size
+            total = _last_progress["total"]
+            bar_length = _last_progress["bar_length"]
+            prefix = _last_progress["prefix"]
+            suffix = _last_progress["suffix"]
+
+            # Create the progress bar
+            progress_ratio = current / total if total > 0 else 0
+            filled_length = int(bar_length * progress_ratio)
+            bar = "█" * filled_length + "░" * (bar_length - filled_length)
+            percentage = int(100 * progress_ratio)
+
+            # Format progress text just like in terminal
+            progress_text = f"{prefix} |{bar}| {percentage}% ({current}/{total})"
+            if suffix:
+                progress_text = f"{progress_text} {suffix}"
+
+            f.write(f"{progress_text}\n\n")
+
+            # Write all the stored messages
+            if _previous_messages:
+                for msg in _previous_messages:
+                    f.write(f"{msg['message']}\n")

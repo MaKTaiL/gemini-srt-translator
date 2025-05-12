@@ -8,9 +8,9 @@ class SubtitleObject(typing.TypedDict):
     index: str
     content: str
 
-You job is to look at each index and check if content in the first list has a suitable {language} translation in the second.
+You job is to look at each index and check if the content in the first list has a suitable {language} translation in the second.
 You don't have to be strict, just check if the content is similar enough to be considered a translation.
-Return the number of the first index you find that does not have a suitable match. If they all match, return -1.
+Return the number of the first index you think does not have a suitable match. If they all match, return -1.
 Do not return any comments or explanations, just the result of the check.
 """
 
