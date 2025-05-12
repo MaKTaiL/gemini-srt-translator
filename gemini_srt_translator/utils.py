@@ -5,6 +5,7 @@ import threading
 import time
 
 import requests
+from packaging import version
 
 from gemini_srt_translator.logger import (
     error,
@@ -28,11 +29,26 @@ def get_installed_version(package_name):
 
 
 def get_latest_pypi_version(package_name):
-    """Fetches the latest version of a package from PyPI."""
+    """Fetches the latest version of a package from PyPI, ignoring pre-release versions."""
     url = f"https://pypi.org/pypi/{package_name}/json"
     response = requests.get(url)
     if response.status_code == 200:
         data = response.json()
+
+        # Filter out pre-release versions (alpha, beta, rc, dev, etc.)
+        releases = data["releases"]
+        stable_versions = [
+            version
+            for version in releases.keys()
+            if not any(pre in version for pre in ["a", "b", "rc", "dev", ".post", ".pre"])
+        ]
+
+        if stable_versions:
+            # Sort versions and get the latest one
+            latest_version = max(stable_versions, key=version.parse)
+            return latest_version
+
+        # If no stable versions, return the current version
         return data["info"]["version"]
     return None
 
