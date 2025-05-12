@@ -83,7 +83,7 @@ You can further customize the translation settings by providing optional paramet
 - `free_quota`: Use free quota for translation (default: True).
 - `skip_upgrade`: Skip version upgrade check (default: False).
 - `use_colors`: Use colors in the console output (default: True).
-- `error_log`: Enable error logging (default: False).
+- `error_log`: Enable saving error logs to file (default: False).
 
 Example:
 

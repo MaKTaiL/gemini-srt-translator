@@ -2,6 +2,7 @@
 *.srt
 traduzir.py
 *.progress
+*.log
 
 # Virtual environment
 venv/
