@@ -8,15 +8,11 @@ import requests
 from packaging import version
 
 from gemini_srt_translator.logger import (
-    error,
     highlight,
     info,
     input_prompt,
-    progress,
-    progress_bar,
     set_color_mode,
     success,
-    warning,
 )
 
 

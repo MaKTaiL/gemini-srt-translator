@@ -34,7 +34,7 @@ from gemini_srt_translator.logger import (
     warning_with_progress,
 )
 
-from .helpers import get_check_instruction, get_instruction, get_safety_settings
+from .helpers import get_instruction, get_safety_settings
 
 
 class SubtitleObject(typing.TypedDict):
@@ -65,6 +65,7 @@ class GeminiSRTTranslator:
         free_quota: bool = True,
         use_colors: bool = True,
         error_log: bool = False,
+        disable_streaming: bool = False,
     ):
         """
         Initialize the translator with necessary parameters.
@@ -81,6 +82,8 @@ class GeminiSRTTranslator:
             batch_size (int): Number of subtitles to process in each batch
             free_quota (bool): Whether to use free quota (affects rate limiting)
             use_colors (bool): Whether to use colored output
+            error_log (bool): Whether to log errors to a file
+            disable_streaming (bool): Whether to disable streaming for translation
         """
 
         if not output_file:
@@ -104,6 +107,7 @@ class GeminiSRTTranslator:
         self.batch_size = batch_size
         self.free_quota = free_quota
         self.error_log = error_log
+        self.disable_streaming = disable_streaming
         self.token_limit = 0
         self.token_count = 0
         self.translated_batch = []
@@ -112,10 +116,6 @@ class GeminiSRTTranslator:
             response_mime_type="application/json",
             safety_settings=get_safety_settings(),
             system_instruction=get_instruction(target_language, description),
-        )
-        self.check_config = types.GenerateContentConfig(
-            safety_settings=get_safety_settings(),
-            system_instruction=get_check_instruction(target_language),
         )
 
         # Set color mode based on user preference
@@ -398,10 +398,11 @@ class GeminiSRTTranslator:
                             parts.append(
                                 SubtitleObject(index=str(k), content=translated_subtitle[k].content),
                             )
-                        previous_message = types.Content(
-                            role="model",
-                            parts=[types.Part(text=json.dumps(parts, ensure_ascii=False))],
-                        )
+                        if len(parts) != 0:
+                            previous_message = types.Content(
+                                role="model",
+                                parts=[types.Part(text=json.dumps(parts, ensure_ascii=False))],
+                            )
                         batch = []
                         progress_bar(
                             i + max(0, last_chunk_size - 1) if self.index_check == -1 else self.index_check,
@@ -410,7 +411,10 @@ class GeminiSRTTranslator:
                             suffix=f"{self.model_name}",
                         )
                         error_with_progress(f"{e_str}")
-                        info_with_progress(f"Reverting to last correct line and retrying...", isSending=True)
+                        if self.disable_streaming or (self.index_check == -1 and last_chunk_size == 0):
+                            info_with_progress("Resending last batch...", isSending=True)
+                        else:
+                            info_with_progress("Resuming from last correct line...", isSending=True)
                         if self.error_log:
                             save_logs_to_file()
                         if self.index_check == -1:
@@ -484,29 +488,6 @@ class GeminiSRTTranslator:
             return False
         return True
 
-    def _validate_batch(self, batch: list[SubtitleObject]) -> int:
-        """
-        Validate the batch of subtitles for translation.
-
-        Args:
-            batch (list[SubtitleObject]): Batch of subtitles to validate
-        """
-        client = self._get_client()
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=[
-                types.Content(
-                    role="user",
-                    parts=[
-                        types.Part(text=json.dumps(batch, ensure_ascii=False)),
-                        types.Part(text=json.dumps(self.translated_batch, ensure_ascii=False)),
-                    ],
-                ),
-            ],
-            config=self.check_config,
-        )
-        return int(response.text)
-
     def _process_batch(
         self,
         batch: list[SubtitleObject],
@@ -533,41 +514,52 @@ class GeminiSRTTranslator:
         response_text = ""
         chunk_size = 0
         self.translated_batch = []
-        for chunk in client.models.generate_content_stream(
-            model=self.model_name, contents=contents, config=self.config
-        ):
-            if not chunk.text:
-                continue
-            response_text += chunk.text
-            try:
-                self.translated_batch: list[SubtitleObject] = json_repair.repair_json(
-                    json_str=response_text,
-                    stream_stable=True,
-                    ensure_ascii=False,
-                    return_objects=True,
-                    skip_json_loads=True,
-                )
-            except:
-                if self.error_log:
-                    with open("json_log.txt", "w", encoding="utf-8") as debug_file:
-                        debug_file.write(response_text)
-                raise Exception(f"Gemini has returned an invalid JSON response.")
-
+        if self.disable_streaming:
+            response = client.models.generate_content(model=self.model_name, contents=contents, config=self.config)
+            if not response.text:
+                raise Exception("Gemini has returned an empty response.")
+            self.translated_batch: list[SubtitleObject] = json_repair.loads(response.text)
             chunk_size = len(self.translated_batch)
+        else:
+            for chunk in client.models.generate_content_stream(
+                model=self.model_name, contents=contents, config=self.config
+            ):
+                if not chunk.text:
+                    continue
+                response_text += chunk.text
+                self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text)
+                chunk_size = len(self.translated_batch)
+                self._process_translated_lines(
+                    translated_lines=self.translated_batch,
+                    translated_subtitle=translated_subtitle,
+                    batch=batch,
+                    finished=False,
+                )
+                update_loading_animation(chunk_size=chunk_size)
+
+        if len(self.translated_batch) == len(batch):
             self._process_translated_lines(
                 translated_lines=self.translated_batch,
                 translated_subtitle=translated_subtitle,
                 batch=batch,
+                finished=True,
             )
-            update_loading_animation(chunk_size=chunk_size)
-
-        if len(self.translated_batch) != len(batch):
-            info_with_progress("", chunk_size=chunk_size, isValidating=True)
-            self.index_check = self._validate_batch(batch)
-            while self.index_check > int(batch[-1]["index"]):
-                self.index_check = self._validate_batch(batch)
-            if self.index_check != -1:
-                raise Exception(f"Gemini has returned a wrong translation at line {self.index_check + 1}.")
+        else:
+            if self.disable_streaming:
+                raise Exception("Gemini has returned an unexpected response.")
+            else:
+                info_with_progress("", chunk_size=chunk_size)
+                self.translated_batch = [
+                    line for line in self.translated_batch if "content" in line and "index" in line
+                ]
+                self.index_check = (
+                    int(self.translated_batch[-1]["index"]) if len(self.translated_batch) < len(batch) else -1
+                )
+                if self.index_check != -1:
+                    raise Exception(f"Gemini has returned an incorrect translation at line {self.index_check + 1}.")
+                else:
+                    info_with_progress("", chunk_size=0)
+                    raise Exception("Gemini has returned an unexpected response.")
 
         batch.clear()
         return types.Content(
@@ -579,6 +571,7 @@ class GeminiSRTTranslator:
         translated_lines: list[SubtitleObject],
         translated_subtitle: list[Subtitle],
         batch: list[SubtitleObject],
+        finished: bool,
     ):
         """
         Process the translated lines and update the subtitle list.
@@ -587,17 +580,26 @@ class GeminiSRTTranslator:
             translated_lines (list[SubtitleObject]): List of translated lines
             translated_subtitle (list[Subtitle]): List to store translated subtitles
             batch (list[SubtitleObject]): Batch of subtitles to translate
+            finished (bool): Whether the translation is finished
         """
+        i = 1
         indexes = [x["index"] for x in batch]
+        last_translated_line = translated_lines[-1]
         for line in translated_lines:
             if "content" not in line or "index" not in line:
-                break
+                if line != last_translated_line or finished:
+                    warning_with_progress("", chunk_size=i)
+                    raise Exception("Gemini has returned an unexpected response.")
+                else:
+                    continue
             if line["index"] not in indexes:
+                warning_with_progress("", chunk_size=i)
                 raise Exception(f"Gemini has returned an unexpected index: {line['index']}.")
             if self._dominant_strong_direction(line["content"]) == "rtl":
                 translated_subtitle[int(line["index"])].content = f"\u202b{line['content']}\u202c"
             else:
                 translated_subtitle[int(line["index"])].content = line["content"]
+            i += 1
 
     def _dominant_strong_direction(self, s: str) -> str:
         """
