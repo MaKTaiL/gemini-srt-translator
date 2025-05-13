@@ -84,6 +84,8 @@ You can further customize the translation settings by providing optional paramet
 - `skip_upgrade`: Skip version upgrade check (default: False).
 - `use_colors`: Use colors in the console output (default: True).
 - `error_log`: Enable saving error logs to file (default: False).
+- `disable_streaming`: Disable streaming mode (default: False).
+  - Wait for entire batch to be processed by Gemini instead of streaming results as they are received. Good for bad/slow internet connections or when using a slow model.
 
 Example:
 
@@ -103,6 +105,7 @@ gst.free_quota = False
 gst.skip_upgrade = True
 gst.use_colors = False
 gst.error_log = True
+gst.disable_streaming = True
 
 gst.translate()
 ```

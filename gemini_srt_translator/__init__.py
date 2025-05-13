@@ -43,8 +43,9 @@ model_name: str = None
 batch_size: int = None
 free_quota: bool = None
 skip_upgrade: bool = None
-use_colors: bool = None
+use_colors: bool = True
 error_log: bool = None
+disable_streaming: bool = None
 
 
 def getmodels():
@@ -145,10 +146,13 @@ def translate():
     gst.skip_upgrade = True
 
     # (Optional) Use colors in the output (default: True)
-    gst.use_colors = True
+    gst.use_colors = False
 
     # (Optional) Enable error logging (default: False)
     gst.error_log = True
+
+    # (Optional) Disable streamed responses (default: False)
+    gst.disable_streaming = True
 
     gst.translate()
     ```
@@ -170,6 +174,7 @@ def translate():
         "free_quota": free_quota,
         "use_colors": use_colors,
         "error_log": error_log,
+        "disable_streaming": disable_streaming,
     }
 
     if not skip_upgrade:
