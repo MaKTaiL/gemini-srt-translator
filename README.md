@@ -10,7 +10,7 @@
 
 ## ✨ Overview
 
-**Gemini SRT Translator** is a powerful tool to translate subtitle (.srt) files using the Google Gemini AI. Perfect for anyone needing fast, accurate, and customizable translations for videos, movies, and series.
+**Gemini SRT Translator** is a powerful python tool to translate subtitle (.srt) files using the Google Gemini AI. Perfect for anyone needing fast, accurate, and customizable translations for videos, movies, and series.
 
 ---
 
@@ -28,7 +28,7 @@
 
 ## 📦 Installation
 
-### Basic Installation
+### Basic:
 
 ```sh
 pip install --upgrade gemini-srt-translator
