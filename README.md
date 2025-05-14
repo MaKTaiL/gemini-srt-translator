@@ -1,68 +1,92 @@
-# Gemini SRT Translator
+# 🌟 Gemini SRT Translator
 
 [![PyPI version](https://img.shields.io/pypi/v/gemini-srt-translator)](https://pypi.org/project/gemini-srt-translator)
-[![Python support](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FMaKTaiL%2Fgemini-srt-translator%2Frefs%2Fheads%2Fmain%2Fpyproject.toml)](https://pypi.org/project/gemini-srt-translator)
+[![Python support](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FMaKTaiL%2Fgemini-srt-translator%2Frefs%2Fheads%2Fmain%2Fpyproject.toml&color=red)](https://pypi.org/project/gemini-srt-translator)
 [![Downloads](https://img.shields.io/pypi/dw/gemini-srt-translator)](https://pypi.org/project/gemini-srt-translator)
 
-## Overview
+> Translate SRT subtitle files using the power of Google Gemini AI! 🚀
 
-Gemini SRT Translator is a tool designed to translate subtitle files using Google Generative AI. It leverages the power of the Gemini API to provide accurate and efficient translations for your subtitle files.
+---
 
-## Features
+## ✨ Overview
 
-- Translate subtitle files to a specified target language.
-- Customize translation settings such as model name and batch size.
-- List available models from the Gemini API.
+**Gemini SRT Translator** is a powerful tool to translate subtitle (.srt) files using the Google Gemini AI. Perfect for anyone needing fast, accurate, and customizable translations for videos, movies, and series.
 
-## Installation
+---
 
-To install Gemini SRT Translator, use pip:
+## 🛠️ Features
+
+- 🔤 Translate SRT files to any language.
+- ⏱️ Preserve the original timing and formatting.
+- 💾 Easily resume interrupted translations.
+- ⚙️ Flexible configuration: model, batch size, and more.
+- 📋 List available models.
+- 🔄 Automatic version checking and updates.
+- 📝 Optional error log saving.
+
+---
+
+## 📦 Installation
+
+### Basic Installation
 
 ```sh
 pip install --upgrade gemini-srt-translator
 ```
 
-## Setup
+### Recommended: Use a Virtual Environment
 
-### Generating Your API Key
+It's best practice to use a virtual environment. This is especially recommended as gemini-srt-translator installs several dependencies that could potentially conflict with your existing packages:
 
-To use Gemini SRT Translator, you need to generate a free API key from Google AI Studio. Follow these steps:
+```sh
+# Create a virtual environment
+python -m venv venv
+
+# Activate the virtual environment
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
+
+# Install inside the virtual environment
+pip install --upgrade gemini-srt-translator
+```
+
+---
+
+## 🔑 How to Get Your API Key
 
 1. Go to [Google AI Studio API Key](https://aistudio.google.com/apikey).
 2. Sign in with your Google account.
-3. Click on "Generate API Key".
-4. Copy the generated API key and keep it secure.
+3. Click on **Generate API Key**.
+4. Copy and keep your key safe.
 
-You will use this API key for setting up the script before starting the translation process.
+---
 
-## Usage
+## 🚀 Quick Start
 
-### Translate Subtitles
-
-You can translate subtitles using the `translate` command:
+### 🌐 Translating an SRT file
 
 ```python
 import gemini_srt_translator as gst
 
-gst.gemini_api_key = "your_gemini_api_key_here"
+gst.gemini_api_key = "your_api_key_here"
 gst.target_language = "French"
 gst.input_file = "subtitle.srt"
 
 gst.translate()
 ```
 
-This will translate the subtitles in the `subtitle.srt` file to French.
+---
 
-### Resuming Partial Translation
+### ⏸️ Resuming an Interrupted Translation
 
-If you want to resume a partial translation (due to interruption or failure), you can simply re-run the script with the same parameters. GST will automatically detect the existence of a partially translated file and prompt if you want to resume.
-
-You can also specify the `start_line` parameter directly in the script and skip the prompt:
+Just run again with the same parameters, or specify the start line:
 
 ```python
 import gemini_srt_translator as gst
 
-gst.gemini_api_key = "your_gemini_api_key_here"
+gst.gemini_api_key = "your_api_key_here"
 gst.target_language = "French"
 gst.input_file = "subtitle.srt"
 gst.start_line = 20
@@ -70,35 +94,37 @@ gst.start_line = 20
 gst.translate()
 ```
 
-## Configuration
+---
 
-You can further customize the translation settings by providing optional parameters:
+## ⚙️ Advanced Configuration
 
-- `gemini_api_key2`: Second Gemini API key for additional quota. (for those using the free version of Pro models)
-- `output_file`: Path and name of the translated subtitle file.
-- `start_line`: Starting line number for translation.
+Customize even further:
+
+- `gemini_api_key2`: Second key for more quota (useful for free Pro models).
+- `output_file`: Name of the translated file.
+- `start_line`: Starting line for translation.
 - `description`: Description of the translation job.
-- `model_name`: Model name to use for translation. (default: "gemini-2.0-flash")
-- `batch_size`: Batch size for translation. (default: 30)
-- `free_quota`: Use free quota for translation (default: True).
+- `model_name`: Gemini model (default: "gemini-2.0-flash").
+- `batch_size`: Batch size (default: 100).
+- `free_quota`: Signal GST that you are using a free quota (default: True).
 - `skip_upgrade`: Skip version upgrade check (default: False).
-- `use_colors`: Use colors in the console output (default: True).
-- `error_log`: Enable saving error logs to file (default: False).
-- `disable_streaming`: Disable streaming mode (default: False).
-  - Wait for entire batch to be processed by Gemini instead of streaming results as they are received. Good for bad/slow internet connections or when using a slow model.
+- `use_colors`: Activate colors in terminal (default: True).
+- `error_log`: Save error logs to a file (default: False).
+- `disable_streaming`: Disable streamed responses. (default: False).
+  - Good for bad internet connections or when using slower models.
 
-Example:
+#### Full example:
 
 ```python
 import gemini_srt_translator as gst
 
-gst.gemini_api_key = "your_gemini_api_key_here"
-gst.gemini_api_key2 = "your_gemini_api_key2_here"
+gst.gemini_api_key = "your_api_key_here"
+gst.gemini_api_key2 = "your_api_key2_here"
 gst.target_language = "French"
 gst.input_file = "subtitle.srt"
 gst.output_file = "subtitle_translated.srt"
 gst.start_line = 20
-gst.description = "Medical television series, use medical terms"
+gst.description = "Medical TV series, use medical terms"
 gst.model_name = "gemini-2.0-flash"
 gst.batch_size = 50
 gst.free_quota = False
@@ -110,19 +136,36 @@ gst.disable_streaming = True
 gst.translate()
 ```
 
-### List Models
+---
 
-You can list the available models using the `listmodels` command:
+## 📚 Listing Available Models
+
+See all available Gemini models:
 
 ```python
 import gemini_srt_translator as gst
 
-gst.gemini_api_key = "your_gemini_api_key_here"
+gst.gemini_api_key = "your_api_key_here"
 gst.listmodels()
 ```
 
-This will print a list of available models to the console.
+---
 
-## License
+## 📝 License
 
-This project is licensed under the MIT License. See the [LICENSE](https://github.com/MaKTaiL/gemini-srt-translator?tab=MIT-1-ov-file) file for details.
+Distributed under the MIT License. See the [LICENSE](https://github.com/MaKTaiL/gemini-srt-translator?tab=MIT-1-ov-file) file for details.
+
+---
+
+## 👥 Contributors
+
+Thank you to all who have contributed to this project:
+
+- [MaKTaiL](https://github.com/MaKTaiL) - Creator and maintainer
+- [CevreMuhendisi](https://github.com/CevreMuhendisi)
+- [angelitto2005](https://github.com/angelitto2005)
+- [sjiampojamarn](https://github.com/sjiampojamarn)
+
+Special thanks to all users who have reported issues, suggested features, and helped improve the project.
+
+---
