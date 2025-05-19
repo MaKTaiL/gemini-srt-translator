@@ -85,7 +85,6 @@ class GeminiSRTTranslator:
             error_log (bool): Whether to log errors to a file
             disable_streaming (bool): Whether to disable streaming for translation
         """
-
         if not output_file:
             try:
                 self.output_file = ".".join(self.input_file.split(".")[:-1]) + "_translated.srt"
@@ -101,6 +100,11 @@ class GeminiSRTTranslator:
         self.backup_api_number = 2
         self.target_language = target_language
         self.input_file = input_file
+        # Set log file path to the same directory as input file
+        if input_file and os.path.dirname(input_file):
+            self.log_file_path = os.path.join(os.path.dirname(input_file), "progress.log")
+        else:
+            self.log_file_path = "progress.log"
         self.start_line = start_line
         self.description = description
         self.model_name = model_name
@@ -321,7 +325,7 @@ class GeminiSRTTranslator:
                 if translated_file:
                     translated_file.write(srt.compose(translated_subtitle))
                 if self.error_log:
-                    save_logs_to_file()
+                    save_logs_to_file(self.log_file_path)
                 self._save_progress(max(1, i - len(batch) + max(0, last_chunk_size - 1) + 1))
                 exit(0)
 
@@ -434,11 +438,11 @@ class GeminiSRTTranslator:
                                 self.index_check = -1
                             info_with_progress(f"Resuming from line {i+1}...")
                         if self.error_log:
-                            save_logs_to_file()
+                            save_logs_to_file(self.log_file_path)
 
             success_with_progress("Translation completed successfully!")
             if self.error_log:
-                save_logs_to_file()
+                save_logs_to_file(self.log_file_path)
             translated_file.write(srt.compose(translated_subtitle))
 
             # Clear progress file on successful completion
