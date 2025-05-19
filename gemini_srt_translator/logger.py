@@ -297,31 +297,49 @@ def get_last_chunk_size() -> int:
     return _last_chunk_size
 
 
-def save_logs_to_file() -> None:
-    """Save the current progress to a file"""
-    with open("progress.log", "w", encoding="utf-8") as f:
-        if _last_progress:
-            # Write progress information in the same format as shown in terminal
-            current = _last_progress["current"] + _last_chunk_size
-            total = _last_progress["total"]
-            bar_length = _last_progress["bar_length"]
-            prefix = _last_progress["prefix"]
-            suffix = _last_progress["suffix"]
+def save_logs_to_file(log_file_path: str = "progress.log") -> bool:
+    """
+    Save the current progress to a file.
 
-            # Create the progress bar
-            progress_ratio = current / total if total > 0 else 0
-            filled_length = int(bar_length * progress_ratio)
-            bar = "█" * filled_length + "░" * (bar_length - filled_length)
-            percentage = int(100 * progress_ratio)
+    Args:
+        log_file_path (str): Path to the log file. Defaults to 'progress.log'.
 
-            # Format progress text just like in terminal
-            progress_text = f"{prefix} |{bar}| {percentage}% ({current}/{total})"
-            if suffix:
-                progress_text = f"{progress_text} {suffix}"
+    Returns:
+        bool: True if logs were saved successfully, False otherwise.
+    """
+    try:
+        # Ensure the directory exists
+        log_dir = os.path.dirname(log_file_path)
+        if log_dir and not os.path.exists(log_dir):
+            os.makedirs(log_dir)
 
-            f.write(f"{progress_text}\n\n")
+        with open(log_file_path, "w", encoding="utf-8") as f:
+            if _last_progress:
+                # Write progress information in the same format as shown in terminal
+                current = _last_progress["current"] + _last_chunk_size
+                total = _last_progress["total"]
+                bar_length = _last_progress["bar_length"]
+                prefix = _last_progress["prefix"]
+                suffix = _last_progress["suffix"]
 
-            # Write all the stored messages
-            if _previous_messages:
-                for msg in _previous_messages:
-                    f.write(f"{msg['message']}\n")
+                # Create the progress bar
+                progress_ratio = current / total if total > 0 else 0
+                filled_length = int(bar_length * progress_ratio)
+                bar = "█" * filled_length + "░" * (bar_length - filled_length)
+                percentage = int(100 * progress_ratio)
+
+                # Format progress text just like in terminal
+                progress_text = f"{prefix} |{bar}| {percentage}% ({current}/{total})"
+                if suffix:
+                    progress_text = f"{progress_text} {suffix}"
+
+                f.write(f"{progress_text}\n\n")
+
+                # Write all the stored messages
+                if _previous_messages:
+                    for msg in _previous_messages:
+                        f.write(f"{msg['message']}\n")
+        return True
+    except (PermissionError, OSError) as e:
+        warning(f"Failed to save logs to {log_file_path}: {e}")
+        return False
