@@ -64,6 +64,10 @@ print()
 print(f"\033[91mTranslating the file. Model used: ”\033[92m{selected_model}\033[91m”. Please wait...\033[0m")
 print()
 gst.translate()
+if os.path.exists(gst.output_file):
+    with open(gst.output_file, 'a') as f:
+        f.flush()
+        os.fsync(f.fileno())
 
 # Text colored in yellow
 print()
