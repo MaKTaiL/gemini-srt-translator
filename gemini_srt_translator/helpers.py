@@ -6,7 +6,7 @@ def get_instruction(language: str, description: str) -> str:
     Get the instruction for the translation model based on the target language.
     """
     instruction = f"""You are an assistant that translates subtitles.
-You will receive a list of the following type:
+You will receive a list of objects of the following type:
 
 class SubtitleObject(typing.TypedDict):
     index: str
@@ -17,6 +17,8 @@ Response: list[SubtitleObject]
 
 Translate the content of each object to {language} and return the list.
 Keep all the formatting, including line breaks.
+Do not under any circumstances merge content from different objects. 
+The content of each object must stay true to the original.
 """
     if description:
         instruction += "\nAdditional user instruction: '" + description + "'"

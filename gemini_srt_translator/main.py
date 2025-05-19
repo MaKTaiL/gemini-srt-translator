@@ -331,33 +331,46 @@ class GeminiSRTTranslator:
             self._save_progress(i)
 
             last_time = 0
+            validated = False
             while i < total or len(batch) > 0:
                 if i < total and len(batch) < self.batch_size:
                     batch.append(SubtitleObject(index=str(i), content=original_subtitle[i].content))
                     i += 1
                     continue
                 try:
-                    if not self._validate_token_size(json.dumps(batch, ensure_ascii=False)):
-                        error_with_progress(
-                            f"Token size ({int(self.token_count/0.9)}) exceeds limit ({self.token_limit}) for {self.model_name}."
-                        )
-                        user_prompt = "0"
-                        while not user_prompt.isdigit() or int(user_prompt) <= 0:
-                            user_prompt = input_prompt_with_progress(
-                                f"Please enter a new batch size (current: {self.batch_size}): "
+                    while not validated:
+                        info_with_progress(f"Validating token size...")
+                        try:
+                            validated = self._validate_token_size(json.dumps(batch, ensure_ascii=False))
+                        except Exception as e:
+                            error_with_progress(f"Error validating token size: {e}")
+                            info_with_progress(f"Retrying validation...")
+                            continue
+                        if not validated:
+                            error_with_progress(
+                                f"Token size ({int(self.token_count/0.9)}) exceeds limit ({self.token_limit}) for {self.model_name}."
                             )
-                            if user_prompt.isdigit() and int(user_prompt) > 0:
-                                new_batch_size = int(user_prompt)
-                                decrement = self.batch_size - new_batch_size
-                                if decrement > 0:
-                                    for _ in range(decrement):
-                                        i -= 1
-                                        batch.pop()
-                                self.batch_size = new_batch_size
-                                info_with_progress(f"Batch size updated to {self.batch_size}.")
-                            else:
-                                warning_with_progress("Invalid input. Batch size must be a positive integer.")
-                        continue
+                            user_prompt = "0"
+                            while not user_prompt.isdigit() or int(user_prompt) <= 0:
+                                user_prompt = input_prompt_with_progress(
+                                    f"Please enter a new batch size (current: {self.batch_size}): "
+                                )
+                                if user_prompt.isdigit() and int(user_prompt) > 0:
+                                    new_batch_size = int(user_prompt)
+                                    decrement = self.batch_size - new_batch_size
+                                    if decrement > 0:
+                                        for _ in range(decrement):
+                                            i -= 1
+                                            batch.pop()
+                                    self.batch_size = new_batch_size
+                                    info_with_progress(f"Batch size updated to {self.batch_size}.")
+                                else:
+                                    warning_with_progress("Invalid input. Batch size must be a positive integer.")
+                            continue
+                        success_with_progress(f"Token size validated. Translating...")
+
+                    if i == total and len(batch) < self.batch_size:
+                        self.batch_size = len(batch)
 
                     start_time = time.time()
                     previous_message = self._process_batch(batch, previous_message, translated_subtitle)
@@ -390,9 +403,9 @@ class GeminiSRTTranslator:
                     else:
                         i -= self.batch_size
                         if self.index_check != -1:
-                            j = self.index_check - 1
+                            j = self.index_check
                         else:
-                            j = i + last_chunk_size - 1
+                            j = i + last_chunk_size
                         parts = []
                         for k in range(i, max(i, j)):
                             parts.append(
@@ -405,7 +418,7 @@ class GeminiSRTTranslator:
                             )
                         batch = []
                         progress_bar(
-                            i + max(0, last_chunk_size - 1) if self.index_check == -1 else self.index_check,
+                            i + max(0, last_chunk_size) if self.index_check == -1 else self.index_check,
                             total,
                             prefix="Translating:",
                             suffix=f"{self.model_name}",
@@ -414,14 +427,14 @@ class GeminiSRTTranslator:
                         if self.disable_streaming or (self.index_check == -1 and last_chunk_size == 0):
                             info_with_progress("Resending last batch...", isSending=True)
                         else:
-                            info_with_progress("Resuming from last correct line...", isSending=True)
+                            if self.index_check == -1:
+                                i += last_chunk_size
+                            else:
+                                i = self.index_check
+                                self.index_check = -1
+                            info_with_progress(f"Resuming from line {i+1}...")
                         if self.error_log:
                             save_logs_to_file()
-                        if self.index_check == -1:
-                            i += last_chunk_size
-                        else:
-                            i = self.index_check
-                            self.index_check = -1
 
             success_with_progress("Translation completed successfully!")
             if self.error_log:
@@ -529,6 +542,8 @@ class GeminiSRTTranslator:
                 response_text += chunk.text
                 self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text)
                 chunk_size = len(self.translated_batch)
+                if chunk_size == 0:
+                    continue
                 self._process_translated_lines(
                     translated_lines=self.translated_batch,
                     translated_subtitle=translated_subtitle,
@@ -589,7 +604,7 @@ class GeminiSRTTranslator:
             if "content" not in line or "index" not in line:
                 if line != last_translated_line or finished:
                     warning_with_progress("", chunk_size=i)
-                    raise Exception("Gemini has returned an unexpected response.")
+                    raise Exception(f"Gemini has returned an incorrect translation at line {i}.")
                 else:
                     continue
             if line["index"] not in indexes:
