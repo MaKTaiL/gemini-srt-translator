@@ -10,19 +10,18 @@
 
 ## ✨ Overview
 
-**Gemini SRT Translator** is a powerful python tool to translate subtitle (.srt) files using the Google Gemini AI. Perfect for anyone needing fast, accurate, and customizable translations for videos, movies, and series.
+**Gemini SRT Translator** is a powerful python tool to translate subtitle files using the power of Google Gemini AI. Perfect for anyone needing fast, accurate, and customizable translations for videos, movies, and series.
 
 ---
 
-## 🛠️ Features
-
-- 🔤 Translate SRT files to any language.
-- ⏱️ Preserve the original timing and formatting.
-- 💾 Easily resume interrupted translations.
-- ⚙️ Flexible configuration: model, batch size, and more.
-- 📋 List available models.
-- 🔄 Automatic version checking and updates.
-- 📝 Optional error log saving.
+- 🔤 **SRT Translation**: Translate `.srt` subtitle files to a wide range of languages supported by Google Gemini AI.
+- ⏱️ **Timing & Format**: Ensures that the translated subtitles maintain the exact timestamps and basic SRT formatting of the original file.
+- 💾 **Quick Resume**: Easily resume interrupted translations from where you left off.
+- 🧠 **Advanced AI**: Leverages thinking and reasoning capabilities for more contextually accurate translations (available on Gemini 2.5 models).
+- ⚙️ **Customizable**: Tune model parameters, adjust batch size, and access other advanced settings.
+- 📋 **List Models**: Easily list all currently available Gemini models to choose the best fit for your needs.
+- 🔄 **Auto-Update**: Keep the tool updated with automatic version checking and update prompts.
+- 📝 **Logging**: Optional saving of progress and 'thinking' process logs for review.
 
 ---
 
@@ -98,22 +97,33 @@ gst.translate()
 
 ## ⚙️ Advanced Configuration
 
-Customize even further:
+#### 🔧 GST Parameters
 
 - `gemini_api_key2`: Second key for more quota (useful for free Pro models).
 - `output_file`: Name of the translated file.
 - `start_line`: Starting line for translation.
 - `description`: Description of the translation job.
-- `model_name`: Gemini model (default: "gemini-2.0-flash").
-- `batch_size`: Batch size (default: 100).
+- `batch_size`: Batch size (default: 300).
 - `free_quota`: Signal GST that you are using a free quota (default: True).
 - `skip_upgrade`: Skip version upgrade check (default: False).
 - `use_colors`: Activate colors in terminal (default: True).
-- `error_log`: Save error logs to a file (default: False).
-- `disable_streaming`: Disable streamed responses. (default: False).
-  - Good for bad internet connections or when using slower models.
+- `progress_log`: Enable progress logging to a file (default: False).
+- `thoughts_log`: Enable logging of the 'thinking' process to a file (default: False).
 
-#### Full example:
+#### 🔬 Model Tuning Parameters
+
+- `model_name`: Gemini model (default: "gemini-2.5-flash-preview-05-20").
+- `temperature`: Controls randomness in output. Lower for more deterministic, higher for more creative (range: 0.0-2.0).
+- `top_p`: Nucleus sampling parameter (range: 0.0-1.0).
+- `top_k`: Top-k sampling parameter (range: >=0).
+- `streaming`: Enable streamed responses (default: True).
+  - Set to `False` for bad internet connections or when using slower models.
+- `thinking`: Enable thinking capability for potentially more accurate translations (default: True).
+  - Only available for Gemini 2.5 models.
+- `thinking_budget`: Token budget for the thinking process (default: 2048, range: 0-24576, 0 also disables thinking).
+  - Only available for Gemini 2.5 Flash (for now).
+
+#### 💡 Full example:
 
 ```python
 import gemini_srt_translator as gst
@@ -125,13 +135,20 @@ gst.input_file = "subtitle.srt"
 gst.output_file = "subtitle_translated.srt"
 gst.start_line = 20
 gst.description = "Medical TV series, use medical terms"
-gst.model_name = "gemini-2.0-flash"
-gst.batch_size = 50
+gst.model_name = "gemini-2.5-pro-preview-03-25" # Example using a different model
+gst.batch_size = 150 # Adjusted batch size
+gst.streaming = True
+gst.thinking = True
+gst.thinking_budget = 4096 # Increased budget for complex content
+gst.temperature = 0.7
+gst.top_p = 0.95
+gst.top_k = 20
 gst.free_quota = False
 gst.skip_upgrade = True
 gst.use_colors = False
 gst.error_log = True
-gst.disable_streaming = True
+gst.progress_log = True # Enable progress logging
+gst.thoughts_log = True # Enable thoughts logging
 
 gst.translate()
 ```

@@ -8,6 +8,7 @@ from typing import Any
 _use_colors = True
 _loading_bars = ["—", "\\", "|", "/"]
 _loading_bars_index = -1
+_thoughts_list = []
 
 
 class Color(Enum):
@@ -127,6 +128,7 @@ def progress_bar(
     isPrompt: bool = False,
     isLoading: bool = False,
     isSending: bool = False,
+    isThinking: bool = False,
     chunk_size: int = 0,
 ) -> None:
     """
@@ -168,16 +170,44 @@ def progress_bar(
         progress_text = f"{progress_text} {suffix}"
     if isLoading:
         progress_text = f"{progress_text} | Processing {_loading_bars[_loading_bars_index]}"
+    elif isThinking:
+        progress_text = f"{progress_text} | Thinking {_loading_bars[_loading_bars_index]}"
     elif current < total and isSending:
         progress_text = f"{progress_text} | Sending batch ↑↑↑"
 
-    # Handle the clearing of lines based on whether we've shown a message
+    # Calculate how many lines we need to clear based on previous messages and terminal width
+    # Start with at least 2 lines (progress bar + empty line)
+    lines_to_clear = 2
+
+    # Get the command used to start the script
+    command_line = " ".join([sys.executable] + sys.argv)
+    # Check if the command line is too long and needs to be wrapped
+    if len(command_line) > terminal_width:
+        # Add additional lines needed for wrapped command line
+        lines_to_clear += len(command_line) // terminal_width - 1
+
+    # Calculate how many lines the progress bar itself might take due to wrapping
+    progress_text_length = len(progress_text)
+    if progress_text_length > terminal_width:
+        # Add additional lines needed for wrapped progress bar text
+        lines_to_clear += progress_text_length // terminal_width
+
+    # Add lines for each previous message, accounting for wrapping
+    for msg in _previous_messages:
+        msg_text = msg["message"]
+        # Calculate how many lines this message would take (accounting for wrapping)
+        msg_lines = (len(msg_text) // terminal_width) + 1
+        lines_to_clear += msg_lines
+
+    # Handle the clearing of lines
     if _has_started:
-        sys.stdout.write(" " * terminal_width)
-        for i in range(len(_previous_messages)):
-            sys.stdout.write("\033[F" + " " * terminal_width + "\r")
-        sys.stdout.write("\033[F" + " " * terminal_width)
-        sys.stdout.write("\033[F" + " " * terminal_width + "\r")
+        # Move cursor to beginning of line
+        sys.stdout.write("\r")
+
+        # Clear each line individually by moving up and clearing
+        for _ in range(lines_to_clear):
+            sys.stdout.write("\033[F")  # Move up one line
+            sys.stdout.write("\033[K")  # Clear the line
     else:
         _has_started = True
 
@@ -285,11 +315,18 @@ def input_prompt_with_progress(message: Any) -> str:
     return progress_bar(**_last_progress, message=message, message_color=Color.WHITE, isPrompt=True)
 
 
-def update_loading_animation(chunk_size: int = 0) -> None:
+def update_loading_animation(chunk_size: int = 0, isThinking: bool = False) -> None:
     """Update the loading animation in the progress bar"""
     global _loading_bars_index
     _loading_bars_index = (_loading_bars_index + 1) % len(_loading_bars)
-    progress_bar(**_last_progress, message="", message_color=None, isLoading=True, chunk_size=chunk_size)
+    progress_bar(
+        **_last_progress,
+        message="",
+        message_color=None,
+        isLoading=not isThinking,
+        isThinking=isThinking,
+        chunk_size=chunk_size,
+    )
 
 
 def get_last_chunk_size() -> int:
@@ -341,5 +378,38 @@ def save_logs_to_file(log_file_path: str = "progress.log") -> bool:
                         f.write(f"{msg['message']}\n")
         return True
     except (PermissionError, OSError) as e:
-        warning(f"Failed to save logs to {log_file_path}: {e}")
+        warning_with_progress(f"Failed to save logs to {log_file_path}: {e}")
+        return False
+
+
+def save_thoughts_to_file(thoughts: str, file_path: str = "thoughts.log", retry: int = 0) -> bool:
+    """
+    Save the current thoughts to a file.
+
+    Args:
+        thoughts (str): The thoughts to save.
+        file_path (str): Path to the file. Defaults to 'thoughts.txt'.
+
+    Returns:
+        bool: True if thoughts were saved successfully, False otherwise.
+    """
+    global _thoughts_list
+
+    _thoughts_list.append({"text": thoughts, "retry": retry})
+
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            for i in range(len(_thoughts_list)):
+                batch_number = i + 1
+                f.write("=" * 80 + "\n\n")
+                if _thoughts_list[i]["retry"] > 0:
+                    f.write(f"Batch {batch_number}.{_thoughts_list[i]['retry']} thoughts (retry):\n\n")
+                else:
+                    f.write(f"Batch {batch_number} thoughts:\n\n")
+                f.write("=" * 80 + "\n\n")
+                f.write(_thoughts_list[i]["text"])
+
+        return True
+    except (PermissionError, OSError) as e:
+        warning_with_progress(f"Failed to save thoughts to {file_path}: {e}")
         return False
