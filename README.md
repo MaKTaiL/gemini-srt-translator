@@ -135,20 +135,19 @@ gst.input_file = "subtitle.srt"
 gst.output_file = "subtitle_translated.srt"
 gst.start_line = 20
 gst.description = "Medical TV series, use medical terms"
-gst.model_name = "gemini-2.5-pro-preview-03-25" # Example using a different model
-gst.batch_size = 150 # Adjusted batch size
+gst.model_name = "gemini-2.5-pro-preview-03-25"
+gst.batch_size = 150
 gst.streaming = True
 gst.thinking = True
-gst.thinking_budget = 4096 # Increased budget for complex content
+gst.thinking_budget = 4096
 gst.temperature = 0.7
 gst.top_p = 0.95
 gst.top_k = 20
 gst.free_quota = False
 gst.skip_upgrade = True
 gst.use_colors = False
-gst.error_log = True
-gst.progress_log = True # Enable progress logging
-gst.thoughts_log = True # Enable thoughts logging
+gst.progress_log = True
+gst.thoughts_log = True
 
 gst.translate()
 ```
