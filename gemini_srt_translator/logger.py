@@ -400,11 +400,11 @@ def save_thoughts_to_file(thoughts: str, file_path: str = "thoughts.log", retry:
     try:
         with open(file_path, "w", encoding="utf-8") as f:
             for i in range(len(_thoughts_list)):
-                batch_number = i + 1
                 f.write("=" * 80 + "\n\n")
                 if _thoughts_list[i]["retry"] > 0:
                     f.write(f"Batch {batch_number}.{_thoughts_list[i]['retry']} thoughts (retry):\n\n")
                 else:
+                    batch_number = i + 1
                     f.write(f"Batch {batch_number} thoughts:\n\n")
                 f.write("=" * 80 + "\n\n")
                 f.write(_thoughts_list[i]["text"])
