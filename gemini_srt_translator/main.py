@@ -632,14 +632,13 @@ class GeminiSRTTranslator:
                         thoughts_text += part.text
                         continue
                     else:
-                        if not done_thinking and self.thoughts_log and self.thinking:
-                            if retry == 0:
-                                info_with_progress(f"Batch {self.batch_number} thinking process saved to file.")
-                            else:
-                                info_with_progress(f"Batch {self.batch_number}.{retry} thinking process saved to file.")
-                            save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
-                            done_thinking = True
                         response_text += part.text
+                if self.thoughts_log and self.thinking:
+                    if retry == 0:
+                        info_with_progress(f"Batch {self.batch_number} thinking process saved to file.")
+                    else:
+                        info_with_progress(f"Batch {self.batch_number}.{retry} thinking process saved to file.")
+                    save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
                 self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text)
             else:
                 response = client.models.generate_content_stream(

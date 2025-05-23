@@ -408,6 +408,7 @@ def save_thoughts_to_file(thoughts: str, file_path: str = "thoughts.log", retry:
                     f.write(f"Batch {batch_number} thoughts:\n\n")
                 f.write("=" * 80 + "\n\n")
                 f.write(_thoughts_list[i]["text"])
+                f.write("\n\n")
 
         return True
     except (PermissionError, OSError) as e:
