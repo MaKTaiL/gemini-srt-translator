@@ -617,10 +617,14 @@ class GeminiSRTTranslator:
             processed = True
             done_thinking = False
             retry += 1
+            blocked = False
             if not self.streaming:
                 response = client.models.generate_content(
                     model=self.model_name, contents=contents, config=self._get_config()
                 )
+                if response.prompt_feedback:
+                    blocked = True
+                    break
                 if not response.text:
                     error_with_progress("Gemini has returned an empty response.")
                     info_with_progress("Sending last batch again...", isSending=True)
@@ -641,10 +645,15 @@ class GeminiSRTTranslator:
                     save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
                 self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text)
             else:
+                if blocked:
+                    break
                 response = client.models.generate_content_stream(
                     model=self.model_name, contents=contents, config=self._get_config()
                 )
                 for chunk in response:
+                    if chunk.prompt_feedback:
+                        blocked = True
+                        break
                     for part in chunk.candidates[0].content.parts:
                         if not part.text:
                             continue
@@ -697,6 +706,11 @@ class GeminiSRTTranslator:
                 info_with_progress("Sending last batch again...", isSending=True)
                 continue
 
+        if blocked:
+            error_with_progress(
+                "Gemini has blocked the translation for unknown reasons. Try changing your description (if you have one) and/or the batch size and try again."
+            )
+            signal.raise_signal(signal.SIGINT)
         parts = []
         parts.append(types.Part(thought=True, text=thoughts_text)) if thoughts_text else None
         parts.append(types.Part(text=response_text))

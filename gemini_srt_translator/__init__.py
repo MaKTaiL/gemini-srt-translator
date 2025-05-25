@@ -209,7 +209,11 @@ def translate():
     }
 
     if not skip_upgrade:
-        upgrade_package("gemini-srt-translator", use_colors=use_colors)
+        try:
+            upgrade_package("gemini-srt-translator", use_colors=use_colors)
+            raise Exception("Upgrade completed.")
+        except Exception:
+            pass
 
     # Filter out None values
     filtered_params = {k: v for k, v in params.items() if v is not None}

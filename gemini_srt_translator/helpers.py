@@ -12,7 +12,7 @@ def get_instruction(language: str, description: str, thinking: bool, thinking_co
         else "\nDo NOT think or reason."
     )
     instruction = (
-        f"You are an assistant that translates subtitles to {language}.\n"
+        f"You are an assistant that translates subtitles from any language to {language}.\n"
         f"You will receive a list of objects, each with two fields:\n\n"
         f"- index: a string identifier\n"
         f"- content: the subtitle text to translate\n\n"
