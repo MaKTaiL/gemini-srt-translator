@@ -35,6 +35,7 @@ from gemini_srt_translator.logger import (
     warning_with_progress,
 )
 
+from . import audio_extractor
 from .helpers import get_instruction, get_response_schema, get_safety_settings
 
 
@@ -57,8 +58,10 @@ class GeminiSRTTranslator:
         gemini_api_key: str = None,
         gemini_api_key2: str = None,
         target_language: str = None,
+        audio_file: str = None,
         input_file: str = None,
         output_file: str = None,
+        video_file: str = None,
         start_line: int = 1,
         description: str = None,
         model_name: str = "gemini-2.5-flash-preview-05-20",
@@ -81,6 +84,7 @@ class GeminiSRTTranslator:
             gemini_api_key (str): Primary Gemini API key
             gemini_api_key2 (str): Secondary Gemini API key for additional quota
             target_language (str): Target language for translation
+            audio_file (str): Path to input audio file
             input_file (str): Path to input subtitle file
             output_file (str): Path to output translated subtitle file
             start_line (int): Line number to start translation from
@@ -117,7 +121,9 @@ class GeminiSRTTranslator:
         self.current_api_number = 1
         self.backup_api_number = 2
         self.target_language = target_language
+        self.audio_file = audio_file
         self.input_file = input_file
+        self.video_file = video_file
         self.start_line = start_line
         self.description = description
         self.model_name = model_name
@@ -164,7 +170,7 @@ class GeminiSRTTranslator:
             top_p=self.top_p,
             top_k=self.top_k,
             system_instruction=get_instruction(
-                self.target_language, self.description, self.thinking, thinking_compatible
+                self.target_language, self.description, self.thinking , self.audio_file, thinking_compatible
             ),
             thinking_config=(
                 types.ThinkingConfig(
@@ -250,6 +256,10 @@ class GeminiSRTTranslator:
         Main translation method. Reads the input subtitle file, translates it in batches,
         and writes the translated subtitles to the output file.
         """
+
+        if self.video_file:
+            self.audio_file = audio_extractor.prepare_audio(self.video_file, "audio.mp3")
+
         if not self.current_api_key:
             error("Please provide a valid Gemini API key.")
             exit(0)
@@ -525,6 +535,8 @@ class GeminiSRTTranslator:
             translated_file.write(srt.compose(translated_subtitle, reindex=False, strict=False))
             translated_file.close()
 
+            if self.video_file:
+                os.remove(self.audio_file)
             # Clear progress file on successful completion
             self._clear_progress()
 
@@ -607,6 +619,16 @@ class GeminiSRTTranslator:
         contents = []
         contents += previous_message
         contents.append(current_message)
+
+        if self.audio_file:
+            with open(self.audio_file, 'rb') as f:
+                audio_bytes = f.read()
+                contents.append(
+                    types.Part.from_bytes(
+                      data=audio_bytes,
+                      mime_type='audio/mp3',
+                    ))
+
         done = False
         retry = -1
         while done == False:
