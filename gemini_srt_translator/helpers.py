@@ -1,7 +1,7 @@
 from google.genai import types
 
 
-def get_instruction(language: str, description: str, thinking: bool, thinking_compatible: bool) -> str:
+def get_instruction(language: str, description: str, thinking: bool, audio_file: str, thinking_compatible: bool) -> str:
     """
     Get the instruction for the translation model based on the target language.
     """
@@ -22,6 +22,17 @@ def get_instruction(language: str, description: str, thinking: bool, thinking_co
         f"Do NOT add or remove any objects.\n"
         f"Do NOT make any changes to the 'index' field."
     )
+
+    if audio_file:
+        instruction += (
+            f"\nAnalyze the speaker's voice in the audio to determine gender, then apply grammatical gender rules for {language}:\n"
+            f"1. Listen for voice characteristics to identify if speaker is male/female\n"
+            f"2. For languages with grammatical gender ({language}):\n"
+            f"   - Use masculine verb forms/adjectives if speaker sounds male\n"
+            f"   - Use feminine verb forms/adjectives if speaker sounds female\n"
+            f"   - Apply gender agreement to: verbs, adjectives, past participles, pronouns\n"
+            f"3. Example: French 'I am tired' -> 'Je suis fatigué' (male) vs 'Je suis fatiguée' (female)\n"
+            f"4. If gender is unclear from voice, try to predict from context and \"Additional user instruction\".\n")
 
     if thinking_compatible:
         instruction += thinking_instruction

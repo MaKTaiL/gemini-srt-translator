@@ -35,7 +35,7 @@ from gemini_srt_translator.logger import (
     warning_with_progress,
 )
 
-from . import audio_extractor
+from .audio_extractor import prepare_audio
 from .helpers import get_instruction, get_response_schema, get_safety_settings
 
 
@@ -258,7 +258,7 @@ class GeminiSRTTranslator:
         """
 
         if self.video_file:
-            self.audio_file = audio_extractor.prepare_audio(self.video_file, "audio.mp3")
+            self.audio_file = prepare_audio(self.video_file, "audio.mp3")
 
         if not self.current_api_key:
             error("Please provide a valid Gemini API key.")
@@ -623,11 +623,16 @@ class GeminiSRTTranslator:
         if self.audio_file:
             with open(self.audio_file, 'rb') as f:
                 audio_bytes = f.read()
-                contents.append(
-                    types.Part.from_bytes(
-                      data=audio_bytes,
-                      mime_type='audio/mp3',
-                    ))
+                audio_part = types.Part.from_bytes(
+                    data=audio_bytes,
+                    mime_type='audio/mp3',
+                )
+                # Create a Content object containing the audio part
+                audio_content = types.Content(
+                    role="user",
+                    parts=[audio_part]
+                )
+                contents.append(audio_content)
 
         done = False
         retry = -1
