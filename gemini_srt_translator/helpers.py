@@ -11,28 +11,41 @@ def get_instruction(language: str, description: str, thinking: bool, audio_file:
         if thinking
         else "\nDo NOT think or reason."
     )
+
+    fields = (
+        (
+            "- index: a string identifier\n"
+            "- content: the text to translate\n"
+            "- time_start: the start time of the segment\n"
+            "- time_end: the end time of the segment\n"
+        )
+        if audio_file
+        else ("- index: a string identifier\n" "- content: the subtitle text to translate\n")
+    )
+
     instruction = (
         f"You are an assistant that translates subtitles from any language to {language}.\n"
-        f"You will receive a list of objects, each with two fields:\n\n"
-        f"- index: a string identifier\n"
-        f"- content: the subtitle text to translate\n\n"
-        f"Translate ONLY the 'content' field of each object.\n"
+        f"You will receive a list of objects, each with these fields:\n\n"
+        f"{fields}"
+        f"\nTranslate ONLY the 'content' field of each object.\n"
         f"Keep line breaks, formatting, and special characters.\n"
         f"Do NOT move or merge 'content' between objects.\n"
         f"Do NOT add or remove any objects.\n"
-        f"Do NOT make any changes to the 'index' field."
+        f"do NOT change the 'index' field.\n"
     )
 
     if audio_file:
         instruction += (
-            f"\nAnalyze the speaker's voice in the audio to determine gender, then apply grammatical gender rules for {language}:\n"
+            f"\nYou will also receive an audio file.\n"
+            f"Use the time_start and time_end of each object to analyze the audio.\n"
+            f"Analyze the speaker's voice in the audio to determine gender, then apply grammatical gender rules for {language}:\n"
             f"1. Listen for voice characteristics to identify if speaker is male/female\n"
-            f"2. For languages with grammatical gender ({language}):\n"
             f"   - Use masculine verb forms/adjectives if speaker sounds male\n"
             f"   - Use feminine verb forms/adjectives if speaker sounds female\n"
             f"   - Apply gender agreement to: verbs, adjectives, past participles, pronouns\n"
-            f"3. Example: French 'I am tired' -> 'Je suis fatigué' (male) vs 'Je suis fatiguée' (female)\n"
-            f"4. If gender is unclear from voice, try to predict from context and \"Additional user instruction\".\n")
+            f"2. Example: French 'I am tired' -> 'Je suis fatigué' (male) vs 'Je suis fatiguée' (female)\n"
+            f"3. If gender is unclear from voice, try to predict from context.\n"
+        )
 
     if thinking_compatible:
         instruction += thinking_instruction
@@ -86,3 +99,14 @@ def get_response_schema() -> types.Schema:
             required=["index", "content"],
         ),
     )
+
+
+if __name__ == "__main__":
+    result = get_instruction(
+        language="English",
+        description="Translate the subtitles accurately.",
+        thinking=True,
+        audio_file="example_audio.mp3",
+        thinking_compatible=True,
+    )
+    print(result)

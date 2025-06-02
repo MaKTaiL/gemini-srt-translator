@@ -132,14 +132,11 @@ def translate():
     # (Optional) Gemini API key 2 for additional quota
     gst.gemini_api_key2 = "your_gemini_api_key2_here"
 
-    # (Optional) Path to audio file used for context
-    gst.audio_file = "audio.mp3"
+    # (Optional) Path to video file used getting audio for context
+    gst.video_file = "movie.mkv"
 
     # (Optional) Path to save the translated subtitle file
     gst.output_file = "translated_subtitle.srt"
-
-    # (Optional) Path to video file used getting audio for context
-    gst.video_file = "movie.mp4"
 
     # (Optional) Line number to start translation from
     gst.start_line = 120
@@ -198,7 +195,6 @@ def translate():
         "gemini_api_key": gemini_api_key,
         "gemini_api_key2": gemini_api_key2,
         "target_language": target_language,
-        "audio_file": audio_file,
         "input_file": input_file,
         "output_file": output_file,
         "video_file": video_file,

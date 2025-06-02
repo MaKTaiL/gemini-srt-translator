@@ -35,7 +35,7 @@ from gemini_srt_translator.logger import (
     warning_with_progress,
 )
 
-from .audio_extractor import prepare_audio
+from .audio_extractor import check_ffmpeg_installation, prepare_audio
 from .helpers import get_instruction, get_response_schema, get_safety_settings
 
 
@@ -46,6 +46,8 @@ class SubtitleObject(typing.TypedDict):
 
     index: str
     content: str
+    time_start: typing.Optional[str] = None
+    time_end: typing.Optional[str] = None
 
 
 class GeminiSRTTranslator:
@@ -58,7 +60,6 @@ class GeminiSRTTranslator:
         gemini_api_key: str = None,
         gemini_api_key2: str = None,
         target_language: str = None,
-        audio_file: str = None,
         input_file: str = None,
         output_file: str = None,
         video_file: str = None,
@@ -84,7 +85,6 @@ class GeminiSRTTranslator:
             gemini_api_key (str): Primary Gemini API key
             gemini_api_key2 (str): Secondary Gemini API key for additional quota
             target_language (str): Target language for translation
-            audio_file (str): Path to input audio file
             input_file (str): Path to input subtitle file
             output_file (str): Path to output translated subtitle file
             start_line (int): Line number to start translation from
@@ -121,9 +121,10 @@ class GeminiSRTTranslator:
         self.current_api_number = 1
         self.backup_api_number = 2
         self.target_language = target_language
-        self.audio_file = audio_file
         self.input_file = input_file
         self.video_file = video_file
+        self.audio_file = None
+        self.audio_part = None
         self.start_line = start_line
         self.description = description
         self.model_name = model_name
@@ -141,6 +142,7 @@ class GeminiSRTTranslator:
         self.token_limit = 0
         self.token_count = 0
         self.translated_batch = []
+        self.ffmpeg_installed = check_ffmpeg_installation()
 
         # Set color mode based on user preference
         set_color_mode(use_colors)
@@ -170,7 +172,7 @@ class GeminiSRTTranslator:
             top_p=self.top_p,
             top_k=self.top_k,
             system_instruction=get_instruction(
-                self.target_language, self.description, self.thinking , self.audio_file, thinking_compatible
+                self.target_language, self.description, self.thinking, self.audio_file, thinking_compatible
             ),
             thinking_config=(
                 types.ThinkingConfig(
@@ -257,8 +259,18 @@ class GeminiSRTTranslator:
         and writes the translated subtitles to the output file.
         """
 
+        if not self.ffmpeg_installed and (self.audio_file or self.video_file):
+            error("FFmpeg is not installed. Please install FFmpeg to use audio features.")
+            exit(0)
+
         if self.video_file:
             self.audio_file = prepare_audio(self.video_file, "audio.mp3")
+            with open(self.audio_file, "rb") as f:
+                audio_bytes = f.read()
+                self.audio_part = types.Part.from_bytes(
+                    data=audio_bytes,
+                    mime_type="audio/mp3",
+                )
 
         if not self.current_api_key:
             error("Please provide a valid Gemini API key.")
@@ -354,24 +366,31 @@ class GeminiSRTTranslator:
             batch = []
             previous_message = []
             if self.start_line > 1:
-                start_idx = max(0, self.start_line - 1 - self.batch_size)
+                start_idx = max(0, self.start_line - 2 - self.batch_size)
+                start_time = original_subtitle[start_idx].start
+                end_time = original_subtitle[self.start_line - 2].end
+                parts = []
+                parts.append(
+                    types.Part(
+                        text=json.dumps(
+                            [
+                                SubtitleObject(
+                                    index=str(j),
+                                    content=original_subtitle[j].content,
+                                    time_start=str(original_subtitle[j].start) if self.audio_file else None,
+                                    time_end=str(original_subtitle[j].end) if self.audio_file else None,
+                                )
+                                for j in range(start_idx, self.start_line - 1)
+                            ],
+                            ensure_ascii=False,
+                        )
+                    )
+                )
+
                 previous_message = [
                     types.Content(
                         role="user",
-                        parts=[
-                            types.Part(
-                                text=json.dumps(
-                                    [
-                                        SubtitleObject(
-                                            index=str(j),
-                                            content=original_subtitle[j].content,
-                                        )
-                                        for j in range(start_idx, self.start_line - 1)
-                                    ],
-                                    ensure_ascii=False,
-                                )
-                            )
-                        ],
+                        parts=parts,
                     ),
                     types.Content(
                         role="model",
@@ -382,6 +401,8 @@ class GeminiSRTTranslator:
                                         SubtitleObject(
                                             index=str(j),
                                             content=translated_subtitle[j].content,
+                                            time_start=str(translated_subtitle[j].start) if self.audio_file else None,
+                                            time_end=str(translated_subtitle[j].end) if self.audio_file else None,
                                         )
                                         for j in range(start_idx, self.start_line - 1)
                                     ],
@@ -424,7 +445,14 @@ class GeminiSRTTranslator:
             validated = False
             while i < total or len(batch) > 0:
                 if i < total and len(batch) < self.batch_size:
-                    batch.append(SubtitleObject(index=str(i), content=original_subtitle[i].content))
+                    batch.append(
+                        SubtitleObject(
+                            index=str(i),
+                            content=original_subtitle[i].content,
+                            time_start=str(original_subtitle[i].start) if self.audio_file else None,
+                            time_end=str(original_subtitle[i].end) if self.audio_file else None,
+                        )
+                    )
                     i += 1
                     continue
                 try:
@@ -497,7 +525,10 @@ class GeminiSRTTranslator:
                         parts_translated = []
                         for k in range(i, max(i, j)):
                             parts_original.append(
-                                SubtitleObject(index=str(k), content=original_subtitle[k].content),
+                                SubtitleObject(
+                                    index=str(k),
+                                    content=original_subtitle[k].content,
+                                ),
                             )
                             parts_translated.append(
                                 SubtitleObject(index=str(k), content=translated_subtitle[k].content),
@@ -535,7 +566,7 @@ class GeminiSRTTranslator:
             translated_file.write(srt.compose(translated_subtitle, reindex=False, strict=False))
             translated_file.close()
 
-            if self.video_file:
+            if self.audio_file:
                 os.remove(self.audio_file)
             # Clear progress file on successful completion
             self._clear_progress()
@@ -615,24 +646,15 @@ class GeminiSRTTranslator:
             Content: The model's response for context in next batch
         """
         client = self._get_client()
-        current_message = types.Content(role="user", parts=[types.Part(text=json.dumps(batch, ensure_ascii=False))])
+        parts = []
+        parts.append(types.Part(text=json.dumps(batch, ensure_ascii=False)))
+        if self.audio_part:
+            parts.append(self.audio_part)
+
+        current_message = types.Content(role="user", parts=parts)
         contents = []
         contents += previous_message
         contents.append(current_message)
-
-        if self.audio_file:
-            with open(self.audio_file, 'rb') as f:
-                audio_bytes = f.read()
-                audio_part = types.Part.from_bytes(
-                    data=audio_bytes,
-                    mime_type='audio/mp3',
-                )
-                # Create a Content object containing the audio part
-                audio_content = types.Content(
-                    role="user",
-                    parts=[audio_part]
-                )
-                contents.append(audio_content)
 
         done = False
         retry = -1
