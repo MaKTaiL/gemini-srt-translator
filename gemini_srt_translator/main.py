@@ -69,7 +69,7 @@ class GeminiSRTTranslator:
         batch_size: int = 300,
         streaming: bool = True,
         thinking: bool = True,
-        thinking_budget: int = 2048,
+        thinking_budget: int = 4096,
         temperature: float = None,
         top_p: float = None,
         top_k: int = None,
@@ -172,7 +172,7 @@ class GeminiSRTTranslator:
             top_p=self.top_p,
             top_k=self.top_k,
             system_instruction=get_instruction(
-                self.target_language, self.description, self.thinking, self.audio_file, thinking_compatible
+                self.target_language, self.description, self.thinking, thinking_compatible, self.audio_file
             ),
             thinking_config=(
                 types.ThinkingConfig(

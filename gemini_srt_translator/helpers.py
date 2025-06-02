@@ -1,7 +1,9 @@
 from google.genai import types
 
 
-def get_instruction(language: str, description: str, thinking: bool, audio_file: str, thinking_compatible: bool) -> str:
+def get_instruction(
+    language: str, description: str, thinking: bool, thinking_compatible: bool, audio_file: str = None
+) -> str:
     """
     Get the instruction for the translation model based on the target language.
     """
@@ -31,7 +33,7 @@ def get_instruction(language: str, description: str, thinking: bool, audio_file:
         f"Keep line breaks, formatting, and special characters.\n"
         f"Do NOT move or merge 'content' between objects.\n"
         f"Do NOT add or remove any objects.\n"
-        f"do NOT change the 'index' field.\n"
+        f"Do NOT change the 'index' field.\n"
     )
 
     if audio_file:
