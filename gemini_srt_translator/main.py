@@ -61,6 +61,7 @@ class GeminiSRTTranslator:
         gemini_api_key2: str = None,
         target_language: str = None,
         input_file: str = None,
+        audio_file: str = None,
         output_file: str = None,
         video_file: str = None,
         start_line: int = 1,
@@ -85,8 +86,10 @@ class GeminiSRTTranslator:
             gemini_api_key (str): Primary Gemini API key
             gemini_api_key2 (str): Secondary Gemini API key for additional quota
             target_language (str): Target language for translation
+            audio_file (str): Path to audio file
             input_file (str): Path to input subtitle file
             output_file (str): Path to output translated subtitle file
+            video_file (str): Path to video file
             start_line (int): Line number to start translation from
             description (str): Additional instructions for translation
             model_name (str): Gemini model to use
@@ -121,9 +124,9 @@ class GeminiSRTTranslator:
         self.current_api_number = 1
         self.backup_api_number = 2
         self.target_language = target_language
+        self.audio_file = audio_file
         self.input_file = input_file
         self.video_file = video_file
-        self.audio_file = None
         self.audio_part = None
         self.start_line = start_line
         self.description = description
@@ -265,12 +268,14 @@ class GeminiSRTTranslator:
 
         if self.video_file:
             self.audio_file = prepare_audio(self.video_file, "audio.mp3")
+
+        if self.audio_file:
             with open(self.audio_file, "rb") as f:
                 audio_bytes = f.read()
                 self.audio_part = types.Part.from_bytes(
                     data=audio_bytes,
                     mime_type="audio/mp3",
-                )
+            )
 
         if not self.current_api_key:
             error("Please provide a valid Gemini API key.")

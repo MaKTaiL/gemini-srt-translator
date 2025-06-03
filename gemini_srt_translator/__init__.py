@@ -132,6 +132,9 @@ def translate():
     # (Optional) Gemini API key 2 for additional quota
     gst.gemini_api_key2 = "your_gemini_api_key2_here"
 
+    # (Optional) Path to audio file used for context
+    gst.video_file = "movie.mkv"
+
     # (Optional) Path to video file used getting audio for context
     gst.video_file = "movie.mkv"
 
@@ -196,6 +199,7 @@ def translate():
         "gemini_api_key2": gemini_api_key2,
         "target_language": target_language,
         "input_file": input_file,
+        "audio_file": audio_file,
         "output_file": output_file,
         "video_file": video_file,
         "start_line": start_line,
