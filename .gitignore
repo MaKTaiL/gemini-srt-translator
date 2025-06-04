@@ -3,9 +3,12 @@
 traduzir.py
 *.progress
 *.log
+*.mp3
+*.mkv
 
 # Virtual environment
 venv/
+uv.lock
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

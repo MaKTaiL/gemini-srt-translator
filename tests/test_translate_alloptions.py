@@ -1,7 +1,9 @@
+import os
+
 import gemini_srt_translator as gst
 
-gst.gemini_api_key = ""
-gst.gemini_api_key2 = ""
+gst.gemini_api_key = os.getenv("GEMINI_API_KEY", "")
+gst.gemini_api_key2 = os.getenv("GEMINI_API_KEY2", "")
 gst.target_language = "French"
 gst.input_file = "subtitle.srt"
 gst.output_file = "translated_subtitle.srt"
