@@ -157,11 +157,14 @@ Examples:
   # Set output file name
     gst translate -i subtitle.srt -l French -o translated_subtitle.srt
 
-  # Extract subtitles from video and translate
+  # Extract subtitles from video and translate (requires FFmpeg)
     gst translate -v movie.mp4 -l Spanish
 
+  # Extract and use audio from video for context (requires FFmpeg)
+    gst translate -v movie.mp4 -l Spanish --extract-audio
+
   # Interactive model selection
-    gst translate -i subtitle.srt -l Portuguese --interactive
+    gst translate -i subtitle.srt -l "Brazilian Portuguese" --interactive
 
   # Resume translation from a specific line
     gst translate -i subtitle.srt -l French --start-line 20
