@@ -29,16 +29,20 @@
 
 """
 
+import os
+
+from .logger import set_quiet_mode
 from .main import GeminiSRTTranslator
 from .utils import upgrade_package
 
-gemini_api_key: str = None
-gemini_api_key2: str = None
+gemini_api_key: str = os.getenv("GEMINI_API_KEY", None)
+gemini_api_key2: str = os.getenv("GEMINI_API_KEY2", None)
 target_language: str = None
-audio_file: str = None
 input_file: str = None
 output_file: str = None
 video_file: str = None
+audio_file: str = None
+extract_audio: bool = None
 start_line: int = None
 description: str = None
 model_name: str = None
@@ -54,6 +58,8 @@ skip_upgrade: bool = None
 use_colors: bool = True
 progress_log: bool = None
 thoughts_log: bool = None
+quiet: bool = None
+resume: bool = None
 
 
 def getmodels():
@@ -132,11 +138,14 @@ def translate():
     # (Optional) Gemini API key 2 for additional quota
     gst.gemini_api_key2 = "your_gemini_api_key2_here"
 
-    # (Optional) Path to audio file used for context
+    # (Optional) Path to video file for srt extraction (if needed) and/or for audio context
     gst.video_file = "movie.mkv"
 
-    # (Optional) Path to video file used getting audio for context
-    gst.video_file = "movie.mkv"
+    # (Optional) Path to audio file for audio context
+    gst.audio_file = "audio.mp3"
+
+    # (Optional) Whether to extract and use audio context from video file
+    gst.extract_audio = False
 
     # (Optional) Path to save the translated subtitle file
     gst.output_file = "translated_subtitle.srt"
@@ -186,6 +195,11 @@ def translate():
     # (Optional) Enable thoughts logging (default: False)
     gst.thoughts_log = False
 
+    # (Optional) Enable quiet mode (default: False)
+    gst.quiet = False
+
+    # (Optional) Skip prompt and set automatic resume mode
+    gst.resume = False
 
     gst.translate()
     ```
@@ -202,6 +216,8 @@ def translate():
         "audio_file": audio_file,
         "output_file": output_file,
         "video_file": video_file,
+        "audio_file": audio_file,
+        "extract_audio": extract_audio,
         "start_line": start_line,
         "description": description,
         "model_name": model_name,
@@ -216,6 +232,7 @@ def translate():
         "use_colors": use_colors,
         "progress_log": progress_log,
         "thoughts_log": thoughts_log,
+        "resume": resume,
     }
 
     if not skip_upgrade:
@@ -224,6 +241,9 @@ def translate():
             raise Exception("Upgrade completed.")
         except Exception:
             pass
+
+    if quiet:
+        set_quiet_mode(quiet)
 
     # Filter out None values
     filtered_params = {k: v for k, v in params.items() if v is not None}

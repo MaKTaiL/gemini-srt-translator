@@ -3,6 +3,8 @@
 [![PyPI version](https://img.shields.io/pypi/v/gemini-srt-translator)](https://pypi.org/project/gemini-srt-translator)
 [![Python support](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FMaKTaiL%2Fgemini-srt-translator%2Frefs%2Fheads%2Fmain%2Fpyproject.toml&color=red)](https://pypi.org/project/gemini-srt-translator)
 [![Downloads](https://img.shields.io/pypi/dw/gemini-srt-translator)](https://pypi.org/project/gemini-srt-translator)
+[![GitHub contributors](https://img.shields.io/github/contributors/MaKTaiL/gemini-srt-translator)](https://github.com/MaKTaiL/gemini-srt-translator/graphs/contributors)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-orange?logo=buy-me-a-coffee)](https://www.buymeacoffee.com/maktail)
 
 > Translate SRT subtitle files using the power of Google Gemini AI! 🚀
 
@@ -18,7 +20,11 @@
 - ⏱️ **Timing & Format**: Ensures that the translated subtitles maintain the exact timestamps and basic SRT formatting of the original file.
 - 💾 **Quick Resume**: Easily resume interrupted translations from where you left off.
 - 🧠 **Advanced AI**: Leverages thinking and reasoning capabilities for more contextually accurate translations (available on Gemini 2.5 models).
+- 🖥️ **CLI Support**: Full command-line interface for easy automation and scripting.
 - ⚙️ **Customizable**: Tune model parameters, adjust batch size, and access other advanced settings.
+- 🎞️ **SRT Extraction**: Extract and translate SRT subtitles from video files automatically (requires [FFmpeg](https://ffmpeg.org/)).
+- 🎵 **Audio Context**: Extract audio from a video file or provide your own to improve translation accuracy (requires [FFmpeg](https://ffmpeg.org/)).
+- 📜 **Description Support**: Add a description to your translation job to guide the AI in using specific terminology or context.
 - 📋 **List Models**: Easily list all currently available Gemini models to choose the best fit for your needs.
 - 🔄 **Auto-Update**: Keep the tool updated with automatic version checking and update prompts.
 - 📝 **Logging**: Optional saving of progress and 'thinking' process logs for review.
@@ -55,16 +61,107 @@ pip install --upgrade gemini-srt-translator
 
 ## 🔑 How to Get Your API Key
 
-1. Go to [Google AI Studio API Key](https://aistudio.google.com/apikey).
+1. Go to [Google AI Studio](https://aistudio.google.com/apikey).
 2. Sign in with your Google account.
 3. Click on **Generate API Key**.
 4. Copy and keep your key safe.
+
+### 🔐 Setting Your API Key
+
+You can provide your API key in several ways:
+
+1. **Environment Variable (Recommended)**: Set the `GEMINI_API_KEY` environment variable
+
+   ```bash
+   export GEMINI_API_KEY="your_api_key_here"
+   export GEMINI_API_KEY2="your_second_api_key_here"  # Optional for additional quota
+   ```
+
+2. **Command Line Argument**: Use the `-k` or `--api-key` flag
+
+   ```bash
+   gemini-srt-translator translate -i subtitle.srt -l French -k YOUR_API_KEY
+   gemini-srt-translator translate -v movie.mp4 -l Spanish -k YOUR_API_KEY
+   ```
+
+3. **Interactive Prompt**: The tool will prompt you if no key is found
+
+   ```bash
+   gemini-srt-translator translate -i subtitle.srt -l French
+   ```
+
+4. **Python API**: Set the `gemini_api_key` variable in your script
+
+   ```python
+   import gemini_srt_translator as gst
+   gst.gemini_api_key = "your_api_key_here"
+   ```
 
 ---
 
 ## 🚀 Quick Start
 
-### 🌐 Translating an SRT file
+### 🖥️ Using the Command Line Interface (CLI)
+
+#### Basic Translation
+
+```bash
+# Using environment variable (recommended)
+export GEMINI_API_KEY="your_api_key_here"
+gst translate -i subtitle.srt -l French
+
+# Using command line argument
+gst translate -i subtitle.srt -l French -k YOUR_API_KEY
+
+# Set output file name
+gst translate -i subtitle.srt -l French -o translated_subtitle.srt
+
+# Extract subtitles from video and translate
+gst translate -v movie.mp4 -l Spanish
+
+# Interactive model selection
+gst translate -i subtitle.srt -l Portuguese --interactive
+
+# Resume translation from a specific line
+gst translate -i subtitle.srt -l French --start-line 20
+
+# Suppress output
+gst translate -i subtitle.srt -l French --quiet
+```
+
+#### Advanced Options
+
+```bash
+# Full-featured translation with custom settings
+gst translate \
+  -i input.srt \
+  -v video.mp4 \
+  -l French \
+  -k YOUR_API_KEY \
+  -k2 YOUR_SECOND_API_KEY \
+  -o output_french.srt \
+  --model gemini-2.5-pro \
+  --batch-size 150 \
+  --temperature 0.7 \
+  --description "Medical TV series, use medical terminology" \
+  --progress-log \
+  --thoughts-log \
+  --extract-audio \
+```
+
+#### CLI Help
+
+```bash
+# Show all available commands and options
+gst --help
+
+# Show specific command help
+gst translate --help
+```
+
+### 🐍 Using Python API
+
+#### Translating an SRT file
 
 ```python
 import gemini_srt_translator as gst
@@ -76,9 +173,7 @@ gst.input_file = "subtitle.srt"
 gst.translate()
 ```
 
----
-
-### ⏸️ Resuming an Interrupted Translation
+#### Resuming an Interrupted Translation
 
 Just run again with the same parameters, or specify the start line:
 
@@ -100,6 +195,9 @@ gst.translate()
 #### 🔧 GST Parameters
 
 - `gemini_api_key2`: Second key for more quota (useful for free Pro models).
+- `video_file`: Path to a video file to extract subtitles and/or audio for context (requires [FFmpeg](https://ffmpeg.org/)).
+- `audio_file`: Path to an audio file to use as context for translation (requires [FFmpeg](https://ffmpeg.org/)).
+- `extract_audio`: Whether to extract and use audio context from the video file (default: False).
 - `output_file`: Name of the translated file.
 - `start_line`: Starting line for translation.
 - `description`: Description of the translation job.
@@ -109,6 +207,8 @@ gst.translate()
 - `use_colors`: Activate colors in terminal (default: True).
 - `progress_log`: Enable progress logging to a file (default: False).
 - `thoughts_log`: Enable logging of the 'thinking' process to a file (default: False).
+- `quiet_mode`: Suppress all output (default: False).
+- `resume`: Skip prompt and set automatic resume mode.
 
 #### 🔬 Model Tuning Parameters
 
@@ -133,6 +233,9 @@ gst.gemini_api_key2 = "your_api_key2_here"
 gst.target_language = "French"
 gst.input_file = "subtitle.srt"
 gst.output_file = "subtitle_translated.srt"
+gst.video_file = "video.mp4"
+gst.audio_file = "audio.mp3"
+gst.extract_audio = False
 gst.start_line = 20
 gst.description = "Medical TV series, use medical terms"
 gst.model_name = "gemini-2.5-pro-preview-03-25"
@@ -148,6 +251,8 @@ gst.skip_upgrade = True
 gst.use_colors = False
 gst.progress_log = True
 gst.thoughts_log = True
+gst.quiet_mode = False
+gst.resume = True
 
 gst.translate()
 ```
@@ -156,7 +261,13 @@ gst.translate()
 
 ## 📚 Listing Available Models
 
-See all available Gemini models:
+### CLI
+
+```bash
+gst list-models -k YOUR_API_KEY
+```
+
+### Python API
 
 ```python
 import gemini_srt_translator as gst
@@ -181,6 +292,7 @@ Thank you to all who have contributed to this project:
 - [CevreMuhendisi](https://github.com/CevreMuhendisi)
 - [angelitto2005](https://github.com/angelitto2005)
 - [sjiampojamarn](https://github.com/sjiampojamarn)
+- [mkaflowski](https://github.com/mkaflowski)
 
 Special thanks to all users who have reported issues, suggested features, and helped improve the project.
 

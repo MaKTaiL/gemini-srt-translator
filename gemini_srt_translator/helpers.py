@@ -22,18 +22,19 @@ def get_instruction(
             "- time_end: the end time of the segment\n"
         )
         if audio_file
-        else ("- index: a string identifier\n" "- content: the subtitle text to translate\n")
+        else ("- index: a string identifier\n" "- content: the text to translate\n")
     )
 
     instruction = (
         f"You are an assistant that translates subtitles from any language to {language}.\n"
         f"You will receive a list of objects, each with these fields:\n\n"
         f"{fields}"
-        f"\nTranslate ONLY the 'content' field of each object.\n"
-        f"Keep line breaks, formatting, and special characters.\n"
+        f"\nTranslate the 'content' field of each object.\n"
+        f"If the 'content' field is empty, leave it as is.\n"
+        f"Preserve line breaks, formatting, and special characters.\n"
         f"Do NOT move or merge 'content' between objects.\n"
         f"Do NOT add or remove any objects.\n"
-        f"Do NOT change the 'index' field.\n"
+        f"Do NOT alter the 'index' field.\n"
     )
 
     if audio_file:
@@ -104,6 +105,8 @@ def get_response_schema() -> types.Schema:
 
 
 if __name__ == "__main__":
+    ### Example usage of the get_instruction function
+
     result = get_instruction(
         language="English",
         description="Translate the subtitles accurately.",

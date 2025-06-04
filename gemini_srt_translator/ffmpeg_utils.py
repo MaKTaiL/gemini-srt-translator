@@ -32,8 +32,9 @@ def compress_audio(extracted_audio_path, target_size_mb=20):
         target_size_mb = target_size_mb - target_size_mb * 0.1
 
     # Create compressed filename (change to .mp3)
-    base_name = os.path.splitext(extracted_audio_path)[0]
-    compressed_path = f"{extracted_audio_path}_compressed.mp3"
+    base_name = os.path.splitext(os.path.basename(extracted_audio_path))[0]
+    dir_name = os.path.dirname(extracted_audio_path)
+    compressed_path = os.path.join(dir_name, f"{base_name}_compressed.mp3")
 
     # Calculate target bitrate based on file duration and target size
     try:
@@ -105,7 +106,7 @@ def compress_audio(extracted_audio_path, target_size_mb=20):
         if new_size > target_size_mb * 1.2:
 
             lower_bitrate = max(16, target_bitrate_kbps // 2)
-            aggressive_path = f"{base_name}_compressed_low.mp3"
+            aggressive_path = os.path.join(dir_name, f"{base_name}_compressed_low.mp3")
 
             cmd = [
                 "ffmpeg",
@@ -136,7 +137,7 @@ def compress_audio(extracted_audio_path, target_size_mb=20):
             os.remove(extracted_audio_path)
 
         # Update the path to reflect the new MP3 file
-        final_path = base_name + ".mp3"
+        final_path = os.path.join(dir_name, f"{base_name}.mp3")
 
         # Only rename if the paths are different
         if compressed_path != final_path:
@@ -337,7 +338,7 @@ def extract_audio_basic(video_path, output_path, channels, stream_index=0):
     return True
 
 
-def process_video(video_path, output_path, isolate_voice):
+def process_video(video_path, isolate_voice):
     """Main function to process video file"""
 
     # Validate input file
@@ -345,26 +346,22 @@ def process_video(video_path, output_path, isolate_voice):
         raise FileNotFoundError(f"Video file not found: {video_path}")
 
     # Create output directory if it doesn't exist
-    output_dir = os.path.dirname(output_path)
-    if output_dir and not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    output_dir = os.path.dirname(video_path)
+    base_name = os.path.splitext(os.path.basename(video_path))[0]
 
     # Get audio information
     try:
         channels, channel_layout, stream_index = get_audio_info(video_path)
 
         # Extract and process audio
-        extracted_audio_path = "extracted_audio.wav"
+        extracted_audio_path = os.path.join(output_dir, f"{base_name}_extracted.wav")
         success = extract_audio(video_path, extracted_audio_path, channels, channel_layout, stream_index, isolate_voice)
 
         if not success:
             return None
 
-        # Check file size and compress if necessary
-        file_size = get_file_size_mb(extracted_audio_path)
-
-        if file_size > 2.0:
-            output_path = compress_audio(extracted_audio_path)
+        info("Compressing extracted audio...")
+        output_path = compress_audio(extracted_audio_path)
 
         return output_path
 
@@ -373,20 +370,16 @@ def process_video(video_path, output_path, isolate_voice):
         return None
 
 
-def prepare_audio(video_path, output_path, isolate_voice=False):
+def prepare_audio(video_path, isolate_voice=False):
     # If output path is provided, use it; otherwise generate one
-    if not output_path:
-        base_name = os.path.splitext(os.path.basename(video_path))[0]
-        output_dir = os.path.dirname(video_path)
-        suffix = "_voice" if isolate_voice else "_audio"
-        original_ext = os.path.splitext(video_path)[1]
-        output_path = os.path.join(output_dir, f"{base_name}{suffix}{original_ext}")
+    output_dir = os.path.dirname(video_path)
+    base_name = os.path.splitext(os.path.basename(video_path))[0]
+    output_path = os.path.join(output_dir, f"{base_name}_extracted.mp3")
 
-    # Check if "extracted_audio.mp3" already exists
-    mp3_path = "extracted_audio.mp3"
-    if os.path.exists(mp3_path):
-        warning(f'"{mp3_path}" already exists. Skipping extraction.')
-        return mp3_path
+    # Check if "extracted.mp3" already exists
+    if os.path.exists(output_path):
+        warning(f'"{os.path.basename(output_path)}" already exists. Skipping extraction.')
+        return output_path
 
     # Check filter availability
     available_filters = []
@@ -397,7 +390,7 @@ def prepare_audio(video_path, output_path, isolate_voice=False):
 
     # Process the video
     info("Starting audio extraction and processing...")
-    result = process_video(video_path, output_path, isolate_voice)
+    result = process_video(video_path, isolate_voice)
 
     if result:
         final_size = get_file_size_mb(result)
@@ -409,6 +402,25 @@ def prepare_audio(video_path, output_path, isolate_voice=False):
     else:
         error("Failed to process video.")
         sys.exit(1)
+
+
+def extract_srt_from_video(video_path) -> str:
+    """
+    Extract SRT subtitles from a video file using FFmpeg.
+    Returns the path to the extracted SRT file.
+    """
+    base_name = os.path.splitext(os.path.basename(video_path))[0]
+    srt_path = os.path.join(os.path.dirname(video_path), f"{base_name}_extracted.srt")
+    if os.path.exists(srt_path):
+        return srt_path
+    cmd = ["ffmpeg", "-v", "quiet", "-i", video_path, "-map", "0:s:0", "-c:s", "srt", srt_path]
+    try:
+        info("Extracting subtitles from video file...")
+        subprocess.run(cmd, check=True)
+        return srt_path
+    except subprocess.CalledProcessError as e:
+        error(f"FFmpeg command failed: {e}")
+        return ""
 
 
 def check_ffmpeg_installation():

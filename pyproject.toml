@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gemini-srt-translator"
-version = "2.0.2"
+version = "2.1.0"
 description = "A tool to translate subtitles using Google Generative AI"
 readme = "README.md"
 license = "MIT"
 authors = [{ name = "Matheus Castro" }]
 dependencies = [
-  "google-genai==1.16.1",
+  "google-genai==1.18.0",
   "srt==3.5.3",
   "json-repair==0.46.0",
   "packaging==25.0",
@@ -29,3 +29,7 @@ classifiers = [
   "Topic :: Text Processing :: Linguistic",
 ]
 requires-python = ">=3.10"
+
+[project.scripts]
+gemini-srt-translator = "gemini_srt_translator.cli:main"
+gst = "gemini_srt_translator.cli:main"

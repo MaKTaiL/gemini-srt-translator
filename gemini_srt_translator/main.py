@@ -35,7 +35,11 @@ from gemini_srt_translator.logger import (
     warning_with_progress,
 )
 
-from .audio_extractor import check_ffmpeg_installation, prepare_audio
+from .ffmpeg_utils import (
+    check_ffmpeg_installation,
+    extract_srt_from_video,
+    prepare_audio,
+)
 from .helpers import get_instruction, get_response_schema, get_safety_settings
 
 
@@ -61,16 +65,17 @@ class GeminiSRTTranslator:
         gemini_api_key2: str = None,
         target_language: str = None,
         input_file: str = None,
-        audio_file: str = None,
         output_file: str = None,
         video_file: str = None,
+        audio_file: str = None,
+        extract_audio: bool = False,
         start_line: int = 1,
         description: str = None,
         model_name: str = "gemini-2.5-flash-preview-05-20",
         batch_size: int = 300,
         streaming: bool = True,
         thinking: bool = True,
-        thinking_budget: int = 4096,
+        thinking_budget: int = 2048,
         temperature: float = None,
         top_p: float = None,
         top_k: int = None,
@@ -78,6 +83,7 @@ class GeminiSRTTranslator:
         use_colors: bool = True,
         progress_log: bool = False,
         thoughts_log: bool = False,
+        resume: bool = None,
     ):
         """
         Initialize the translator with necessary parameters.
@@ -89,7 +95,9 @@ class GeminiSRTTranslator:
             audio_file (str): Path to audio file
             input_file (str): Path to input subtitle file
             output_file (str): Path to output translated subtitle file
-            video_file (str): Path to video file
+            video_file (str): Path to video file for srt/audio extraction
+            audio_file (str): Path to audio file for translation
+            extract_audio (bool): Whether to extract audio from video for translation
             start_line (int): Line number to start translation from
             description (str): Additional instructions for translation
             model_name (str): Gemini model to use
@@ -103,36 +111,38 @@ class GeminiSRTTranslator:
             thoughts_log (bool): Whether to log thoughts to a file
         """
 
-        if input_file and os.path.dirname(input_file):
-            self.log_file_path = os.path.join(os.path.dirname(input_file), "progress.log")
-            self.thoughts_file_path = os.path.join(os.path.dirname(input_file), "thoughts.log")
-        else:
-            self.log_file_path = "progress.log"
-            self.thoughts_file_path = "thoughts.log"
+        base_file = input_file or video_file
+        base_name = os.path.splitext(os.path.basename(base_file))[0] if base_file else "translated"
+        dir_path = os.path.dirname(base_file) if base_file else ""
 
-        if not output_file:
-            try:
-                self.output_file = ".".join(self.input_file.split(".")[:-1]) + "_translated.srt"
-            except:
-                self.output_file = "translated.srt"
-        else:
+        self.log_file_path = (
+            os.path.join(dir_path, f"{base_name}.progress.log") if dir_path else f"{base_name}.progress.log"
+        )
+        self.thoughts_file_path = (
+            os.path.join(dir_path, f"{base_name}.thoughts.log") if dir_path else f"{base_name}.thoughts.log"
+        )
+
+        if output_file:
             self.output_file = output_file
+        else:
+            suffix = "_translated.srt" if input_file else ".srt"
+            self.output_file = os.path.join(dir_path, f"{base_name}{suffix}") if dir_path else f"{base_name}{suffix}"
+
+        self.progress_file = os.path.join(dir_path, f"{base_name}.progress") if dir_path else f"{base_name}.progress"
 
         self.gemini_api_key = gemini_api_key
         self.gemini_api_key2 = gemini_api_key2
         self.current_api_key = gemini_api_key
-        self.current_api_number = 1
-        self.backup_api_number = 2
         self.target_language = target_language
         self.audio_file = audio_file
         self.input_file = input_file
         self.video_file = video_file
-        self.audio_part = None
+        self.audio_file = audio_file
+        self.extract_audio = extract_audio
         self.start_line = start_line
         self.description = description
         self.model_name = model_name
         self.batch_size = batch_size
-        self.batch_number = 1
         self.streaming = streaming
         self.thinking = thinking
         self.thinking_budget = thinking_budget if thinking else 0
@@ -142,21 +152,21 @@ class GeminiSRTTranslator:
         self.free_quota = free_quota
         self.progress_log = progress_log
         self.thoughts_log = thoughts_log
+        self.resume = resume
+
+        self.current_api_number = 1
+        self.backup_api_number = 2
+        self.batch_number = 1
+        self.audio_file = None
+        self.audio_part = None
         self.token_limit = 0
         self.token_count = 0
         self.translated_batch = []
+        self.srt_extracted = False
         self.ffmpeg_installed = check_ffmpeg_installation()
 
         # Set color mode based on user preference
         set_color_mode(use_colors)
-
-        # Initialize progress tracking file path
-        self.progress_file = None
-        if input_file:
-            self.progress_file = os.path.join(os.path.dirname(input_file), f".{os.path.basename(input_file)}.progress")
-
-        # Check for saved progress
-        self._check_saved_progress()
 
     def _get_config(self):
         """Get the configuration for the translation model."""
@@ -208,7 +218,12 @@ class GeminiSRTTranslator:
                     return
 
                 if saved_line > 1 and self.start_line == 1:
-                    resume = input_prompt(f"Found saved progress. Resume? (y/n): ").lower().strip()
+                    if self.resume is None:
+                        resume = input_prompt(f"Found saved progress. Resume? (y/n): ", mode="resume").lower().strip()
+                    elif self.resume is True:
+                        resume = "y"
+                    elif self.resume is False:
+                        resume = "n"
                     if resume == "y" or resume == "yes":
                         info(f"Resuming from line {saved_line}")
                         self.start_line = saved_line
@@ -233,14 +248,6 @@ class GeminiSRTTranslator:
         except Exception as e:
             warning_with_progress(f"Failed to save progress: {e}")
 
-    def _clear_progress(self):
-        """Clear the progress file on successful completion"""
-        if self.progress_file and os.path.exists(self.progress_file):
-            try:
-                os.remove(self.progress_file)
-            except Exception as e:
-                warning(f"Failed to remove progress file: {e}")
-
     def getmodels(self):
         """Get available Gemini models that support content generation."""
         if not self.current_api_key:
@@ -262,53 +269,77 @@ class GeminiSRTTranslator:
         and writes the translated subtitles to the output file.
         """
 
-        if not self.ffmpeg_installed and (self.audio_file or self.video_file):
-            error("FFmpeg is not installed. Please install FFmpeg to use audio features.")
+        if not self.ffmpeg_installed and self.video_file:
+            error("FFmpeg is not installed. Please install FFmpeg to use video features.", ignore_quiet=True)
             exit(0)
 
-        if self.video_file:
-            self.audio_file = prepare_audio(self.video_file, "audio.mp3")
+        if self.video_file and self.extract_audio:
+            if os.path.exists(self.video_file):
+                self.audio_file = prepare_audio(self.video_file)
+            else:
+                error(f"Video file {self.video_file} does not exist.", ignore_quiet=True)
+                exit(0)
 
         if self.audio_file:
-            with open(self.audio_file, "rb") as f:
-                audio_bytes = f.read()
-                self.audio_part = types.Part.from_bytes(
-                    data=audio_bytes,
-                    mime_type="audio/mp3",
-            )
+            if os.path.exists(self.audio_file):
+                with open(self.audio_file, "rb") as f:
+                    audio_bytes = f.read()
+                    self.audio_part = types.Part.from_bytes(
+                        data=audio_bytes,
+                        mime_type="audio/mp3",
+                    )
+            else:
+                error(f"Audio file {self.audio_file} does not exist.", ignore_quiet=True)
+                exit(0)
+
+        if self.video_file and not self.input_file:
+            if not os.path.exists(self.video_file):
+                error(f"Video file {self.video_file} does not exist.", ignore_quiet=True)
+                exit(0)
+            self.input_file = extract_srt_from_video(self.video_file)
+            if not self.input_file:
+                error("Failed to extract subtitles from video file.", ignore_quiet=True)
+                exit(0)
+            self.srt_extracted = True
 
         if not self.current_api_key:
-            error("Please provide a valid Gemini API key.")
+            error("Please provide a valid Gemini API key.", ignore_quiet=True)
             exit(0)
 
         if not self.target_language:
-            error("Please provide a target language.")
+            error("Please provide a target language.", ignore_quiet=True)
             exit(0)
 
-        if not self.input_file:
-            error("Please provide a subtitle file.")
+        if self.input_file and not os.path.exists(self.input_file):
+            error(f"Input file {self.input_file} does not exist.", ignore_quiet=True)
+            exit(0)
+
+        elif not self.input_file:
+            error("Please provide a subtitle or video file.", ignore_quiet=True)
             exit(0)
 
         if self.thinking_budget < 0 or self.thinking_budget > 24576:
-            error("Thinking budget must be between 0 and 24576. 0 disables thinking.")
+            error("Thinking budget must be between 0 and 24576. 0 disables thinking.", ignore_quiet=True)
             exit(0)
 
         if self.temperature is not None and (self.temperature < 0 or self.temperature > 2):
-            error("Temperature must be between 0.0 and 2.0.")
+            error("Temperature must be between 0.0 and 2.0.", ignore_quiet=True)
             exit(0)
 
         if self.top_p is not None and (self.top_p < 0 or self.top_p > 1):
-            error("Top P must be between 0.0 and 1.0.")
+            error("Top P must be between 0.0 and 1.0.", ignore_quiet=True)
             exit(0)
 
         if self.top_k is not None and self.top_k < 0:
-            error("Top K must be a non-negative integer.")
+            error("Top K must be a non-negative integer.", ignore_quiet=True)
             exit(0)
+
+        self._check_saved_progress()
 
         models = self.getmodels()
 
         if self.model_name not in models:
-            error(f"Model {self.model_name} is not available. Please choose a different model.")
+            error(f"Model {self.model_name} is not available. Please choose a different model.", ignore_quiet=True)
             exit(0)
 
         self._get_token_limit()
@@ -325,7 +356,9 @@ class GeminiSRTTranslator:
                         try:
                             self.start_line = int(
                                 input_prompt(
-                                    f"Enter the line number to start from (1 to {len(original_subtitle)}): "
+                                    f"Enter the line number to start from (1 to {len(original_subtitle)}): ",
+                                    mode="line",
+                                    max_length=len(original_subtitle),
                                 ).strip()
                             )
                             if self.start_line < 1 or self.start_line > len(original_subtitle):
@@ -342,14 +375,17 @@ class GeminiSRTTranslator:
 
             if len(original_subtitle) != len(translated_subtitle):
                 error(
-                    f"Number of lines of existing translated file does not match the number of lines in the original file."
+                    f"Number of lines of existing translated file does not match the number of lines in the original file.",
+                    ignore_quiet=True,
                 )
                 exit(0)
 
             translated_file = open(self.output_file, "w", encoding="utf-8")
 
             if self.start_line > len(original_subtitle) or self.start_line < 1:
-                error(f"Start line must be between 1 and {len(original_subtitle)}. Please try again.")
+                error(
+                    f"Start line must be between 1 and {len(original_subtitle)}. Please try again.", ignore_quiet=True
+                )
                 exit(0)
 
             if len(original_subtitle) < self.batch_size:
@@ -374,8 +410,8 @@ class GeminiSRTTranslator:
                 start_idx = max(0, self.start_line - 2 - self.batch_size)
                 start_time = original_subtitle[start_idx].start
                 end_time = original_subtitle[self.start_line - 2].end
-                parts = []
-                parts.append(
+                parts_user = []
+                parts_user.append(
                     types.Part(
                         text=json.dumps(
                             [
@@ -392,29 +428,30 @@ class GeminiSRTTranslator:
                     )
                 )
 
+                parts_model = []
+                parts_model.append(
+                    types.Part(
+                        text=json.dumps(
+                            [
+                                SubtitleObject(
+                                    index=str(j),
+                                    content=translated_subtitle[j].content,
+                                )
+                                for j in range(start_idx, self.start_line - 1)
+                            ],
+                            ensure_ascii=False,
+                        )
+                    )
+                )
+
                 previous_message = [
                     types.Content(
                         role="user",
-                        parts=parts,
+                        parts=parts_user,
                     ),
                     types.Content(
                         role="model",
-                        parts=[
-                            types.Part(
-                                text=json.dumps(
-                                    [
-                                        SubtitleObject(
-                                            index=str(j),
-                                            content=translated_subtitle[j].content,
-                                            time_start=str(translated_subtitle[j].start) if self.audio_file else None,
-                                            time_end=str(translated_subtitle[j].end) if self.audio_file else None,
-                                        )
-                                        for j in range(start_idx, self.start_line - 1)
-                                    ],
-                                    ensure_ascii=False,
-                                )
-                            )
-                        ],
+                        parts=parts_model,
                     ),
                 ]
 
@@ -476,7 +513,8 @@ class GeminiSRTTranslator:
                             user_prompt = "0"
                             while not user_prompt.isdigit() or int(user_prompt) <= 0:
                                 user_prompt = input_prompt_with_progress(
-                                    f"Please enter a new batch size (current: {self.batch_size}): "
+                                    f"Please enter a new batch size (current: {self.batch_size}): ",
+                                    batch_size=self.batch_size,
                                 )
                                 if user_prompt.isdigit() and int(user_prompt) > 0:
                                     new_batch_size = int(user_prompt)
@@ -571,10 +609,14 @@ class GeminiSRTTranslator:
             translated_file.write(srt.compose(translated_subtitle, reindex=False, strict=False))
             translated_file.close()
 
-            if self.audio_file:
+            if self.audio_file and os.path.exists(self.audio_file):
                 os.remove(self.audio_file)
-            # Clear progress file on successful completion
-            self._clear_progress()
+
+            if self.progress_file and os.path.exists(self.progress_file):
+                os.remove(self.progress_file)
+
+        if self.srt_extracted and os.path.exists(self.input_file):
+            os.remove(self.input_file)
 
     def _switch_api(self) -> bool:
         """
@@ -804,9 +846,14 @@ class GeminiSRTTranslator:
             if line["index"] not in indexes:
                 warning_with_progress(f"Gemini has returned an unexpected line: {int(line['index']) + 1}.")
                 return False
-            if line != last_translated_line and line["content"] == "":
-                warning_with_progress(f"Gemini has returned an empty translation for line {int(line['index']) + 1}.")
-                return False
+            if line["content"] == "" and batch[i]["content"] != "":
+                if line != last_translated_line or finished:
+                    warning_with_progress(
+                        f"Gemini has returned an empty translation for line {int(line['index']) + 1}."
+                    )
+                    return False
+                else:
+                    continue
             if self._dominant_strong_direction(line["content"]) == "rtl":
                 translated_subtitle[int(line["index"])].content = f"\u202b{line['content']}\u202c"
             else:

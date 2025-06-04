@@ -1,7 +1,8 @@
 import os
+
 import gemini_srt_translator as gst
 
-gst.gemini_api_key = ""
+gst.gemini_api_key = os.getenv("GEMINI_API_KEY", "")
 gst.target_language = "French"
 
 input_dir = r"input folder"
