@@ -213,7 +213,6 @@ def translate():
         "gemini_api_key2": gemini_api_key2,
         "target_language": target_language,
         "input_file": input_file,
-        "audio_file": audio_file,
         "output_file": output_file,
         "video_file": video_file,
         "audio_file": audio_file,

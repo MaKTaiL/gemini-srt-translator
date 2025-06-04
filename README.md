@@ -70,12 +70,27 @@ pip install --upgrade gemini-srt-translator
 
 You can provide your API key in several ways:
 
-1. **Environment Variable (Recommended)**: Set the `GEMINI_API_KEY` environment variable
+1. **Environment Variable (Recommended)**: Set the `GEMINI_API_KEY` environment variable. This is the most secure and recommended method.
 
-   ```bash
-   export GEMINI_API_KEY="your_api_key_here"
-   export GEMINI_API_KEY2="your_second_api_key_here"  # Optional for additional quota
-   ```
+- **macOS/Linux:**
+
+  ```bash
+  export GEMINI_API_KEY="your_api_key_here"
+  export GEMINI_API_KEY2="your_second_api_key_here"
+  ```
+
+- **Windows (Command Prompt):**
+
+  ```cmd
+  set GEMINI_API_KEY=your_api_key_here
+  set GEMINI_API_KEY2=your_second_api_key_here
+  ```
+
+- **Windows (PowerShell):**
+  ```powershell
+  $env:GEMINI_API_KEY="your_api_key_here"
+  $env:GEMINI_API_KEY2="your_second_api_key_here"  # Optional for additional quota
+  ```
 
 2. **Command Line Argument**: Use the `-k` or `--api-key` flag
 
@@ -116,11 +131,14 @@ gst translate -i subtitle.srt -l French -k YOUR_API_KEY
 # Set output file name
 gst translate -i subtitle.srt -l French -o translated_subtitle.srt
 
-# Extract subtitles from video and translate
+# Extract subtitles from video and translate (requires FFmpeg)
 gst translate -v movie.mp4 -l Spanish
 
+# Extract and use audio from video for context (requires FFmpeg)
+gst translate -v movie.mp4 -l Spanish --extract-audio
+
 # Interactive model selection
-gst translate -i subtitle.srt -l Portuguese --interactive
+gst translate -i subtitle.srt -l "Brazilian Portuguese" --interactive
 
 # Resume translation from a specific line
 gst translate -i subtitle.srt -l French --start-line 20

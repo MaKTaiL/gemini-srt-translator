@@ -134,7 +134,6 @@ class GeminiSRTTranslator:
         self.gemini_api_key2 = gemini_api_key2
         self.current_api_key = gemini_api_key
         self.target_language = target_language
-        self.audio_file = audio_file
         self.input_file = input_file
         self.video_file = video_file
         self.audio_file = audio_file
@@ -157,7 +156,6 @@ class GeminiSRTTranslator:
         self.current_api_number = 1
         self.backup_api_number = 2
         self.batch_number = 1
-        self.audio_file = None
         self.audio_part = None
         self.token_limit = 0
         self.token_count = 0
