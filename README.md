@@ -80,14 +80,14 @@ You can provide your API key in several ways:
 2. **Command Line Argument**: Use the `-k` or `--api-key` flag
 
    ```bash
-   gemini-srt-translator translate -i subtitle.srt -l French -k YOUR_API_KEY
-   gemini-srt-translator translate -v movie.mp4 -l Spanish -k YOUR_API_KEY
+   gst translate -i subtitle.srt -l French -k YOUR_API_KEY
+   gst translate -v movie.mp4 -l Spanish -k YOUR_API_KEY
    ```
 
 3. **Interactive Prompt**: The tool will prompt you if no key is found
 
    ```bash
-   gemini-srt-translator translate -i subtitle.srt -l French
+   gst translate -i subtitle.srt -l French
    ```
 
 4. **Python API**: Set the `gemini_api_key` variable in your script
