@@ -161,6 +161,7 @@ class GeminiSRTTranslator:
         self.token_count = 0
         self.translated_batch = []
         self.srt_extracted = False
+        self.audio_extracted = False
         self.ffmpeg_installed = check_ffmpeg_installation()
 
         # Set color mode based on user preference
@@ -274,6 +275,7 @@ class GeminiSRTTranslator:
         if self.video_file and self.extract_audio:
             if os.path.exists(self.video_file):
                 self.audio_file = prepare_audio(self.video_file)
+                self.audio_extracted = True
             else:
                 error(f"Video file {self.video_file} does not exist.", ignore_quiet=True)
                 exit(0)
@@ -607,7 +609,7 @@ class GeminiSRTTranslator:
             translated_file.write(srt.compose(translated_subtitle, reindex=False, strict=False))
             translated_file.close()
 
-            if self.audio_file and os.path.exists(self.audio_file):
+            if self.audio_file and os.path.exists(self.audio_file) and self.audio_extracted:
                 os.remove(self.audio_file)
 
             if self.progress_file and os.path.exists(self.progress_file):
