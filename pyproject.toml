@@ -10,9 +10,9 @@ readme = "README.md"
 license = "MIT"
 authors = [{ name = "Matheus Castro" }]
 dependencies = [
-  "google-genai==1.18.0",
+  "google-genai==1.19.0",
   "srt==3.5.3",
-  "json-repair==0.46.0",
+  "json-repair==0.46.1",
   "packaging==25.0",
 ]
 classifiers = [

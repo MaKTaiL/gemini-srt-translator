@@ -69,7 +69,7 @@ class GeminiSRTTranslator:
         video_file: str = None,
         audio_file: str = None,
         extract_audio: bool = False,
-        start_line: int = 1,
+        start_line: int = None,
         description: str = None,
         model_name: str = "gemini-2.5-flash-preview-05-20",
         batch_size: int = 300,
@@ -92,7 +92,6 @@ class GeminiSRTTranslator:
             gemini_api_key (str): Primary Gemini API key
             gemini_api_key2 (str): Secondary Gemini API key for additional quota
             target_language (str): Target language for translation
-            audio_file (str): Path to audio file
             input_file (str): Path to input subtitle file
             output_file (str): Path to output translated subtitle file
             video_file (str): Path to video file for srt/audio extraction
@@ -184,7 +183,11 @@ class GeminiSRTTranslator:
             top_p=self.top_p,
             top_k=self.top_k,
             system_instruction=get_instruction(
-                self.target_language, self.description, self.thinking, thinking_compatible, self.audio_file
+                language=self.target_language,
+                thinking=self.thinking,
+                thinking_compatible=thinking_compatible,
+                audio_file=self.audio_file,
+                description=self.description,
             ),
             thinking_config=(
                 types.ThinkingConfig(
@@ -201,7 +204,7 @@ class GeminiSRTTranslator:
         if not self.progress_file or not os.path.exists(self.progress_file):
             return
 
-        if self.start_line != 1:
+        if self.start_line != None:
             return
 
         try:
@@ -216,7 +219,7 @@ class GeminiSRTTranslator:
                     warning("Ignoring saved progress.")
                     return
 
-                if saved_line > 1 and self.start_line == 1:
+                if saved_line > 1:
                     if self.resume is None:
                         resume = input_prompt(f"Found saved progress. Resume? (y/n): ", mode="resume").lower().strip()
                     elif self.resume is True:
@@ -251,7 +254,7 @@ class GeminiSRTTranslator:
         """Get available Gemini models that support content generation."""
         if not self.current_api_key:
             error("Please provide a valid Gemini API key.")
-            exit(0)
+            exit(1)
 
         client = self._get_client()
         models = client.models.list()
@@ -270,7 +273,7 @@ class GeminiSRTTranslator:
 
         if not self.ffmpeg_installed and self.video_file:
             error("FFmpeg is not installed. Please install FFmpeg to use video features.", ignore_quiet=True)
-            exit(0)
+            exit(1)
 
         if self.video_file and self.extract_audio:
             if os.path.exists(self.video_file):
@@ -278,61 +281,58 @@ class GeminiSRTTranslator:
                 self.audio_extracted = True
             else:
                 error(f"Video file {self.video_file} does not exist.", ignore_quiet=True)
-                exit(0)
+                exit(1)
 
         if self.audio_file:
             if os.path.exists(self.audio_file):
                 with open(self.audio_file, "rb") as f:
                     audio_bytes = f.read()
-                    self.audio_part = types.Part.from_bytes(
-                        data=audio_bytes,
-                        mime_type="audio/mp3",
-                    )
+                    self.audio_part = types.Part.from_bytes(data=audio_bytes, mime_type="audio/mpeg")
             else:
                 error(f"Audio file {self.audio_file} does not exist.", ignore_quiet=True)
-                exit(0)
+                exit(1)
 
         if self.video_file and not self.input_file:
             if not os.path.exists(self.video_file):
                 error(f"Video file {self.video_file} does not exist.", ignore_quiet=True)
-                exit(0)
+                exit(1)
             self.input_file = extract_srt_from_video(self.video_file)
             if not self.input_file:
                 error("Failed to extract subtitles from video file.", ignore_quiet=True)
-                exit(0)
+                exit(1)
             self.srt_extracted = True
 
         if not self.current_api_key:
             error("Please provide a valid Gemini API key.", ignore_quiet=True)
-            exit(0)
+            exit(1)
 
         if not self.target_language:
             error("Please provide a target language.", ignore_quiet=True)
-            exit(0)
+            exit(1)
 
         if self.input_file and not os.path.exists(self.input_file):
             error(f"Input file {self.input_file} does not exist.", ignore_quiet=True)
-            exit(0)
+            exit(1)
 
         elif not self.input_file:
             error("Please provide a subtitle or video file.", ignore_quiet=True)
-            exit(0)
+            exit(1)
 
         if self.thinking_budget < 0 or self.thinking_budget > 24576:
             error("Thinking budget must be between 0 and 24576. 0 disables thinking.", ignore_quiet=True)
-            exit(0)
+            exit(1)
 
         if self.temperature is not None and (self.temperature < 0 or self.temperature > 2):
             error("Temperature must be between 0.0 and 2.0.", ignore_quiet=True)
-            exit(0)
+            exit(1)
 
         if self.top_p is not None and (self.top_p < 0 or self.top_p > 1):
             error("Top P must be between 0.0 and 1.0.", ignore_quiet=True)
-            exit(0)
+            exit(1)
 
         if self.top_k is not None and self.top_k < 0:
             error("Top K must be a non-negative integer.", ignore_quiet=True)
-            exit(0)
+            exit(1)
 
         self._check_saved_progress()
 
@@ -340,7 +340,7 @@ class GeminiSRTTranslator:
 
         if self.model_name not in models:
             error(f"Model {self.model_name} is not available. Please choose a different model.", ignore_quiet=True)
-            exit(0)
+            exit(1)
 
         self._get_token_limit()
 
@@ -350,8 +350,8 @@ class GeminiSRTTranslator:
             try:
                 translated_file_exists = open(self.output_file, "r", encoding="utf-8")
                 translated_subtitle = list(srt.parse(translated_file_exists.read()))
-                if self.start_line == 1:
-                    info(f"Translated file {self.output_file} already exists. Loading existing translation...\n")
+                info(f"Translated file {self.output_file} already exists. Loading existing translation...\n")
+                if self.start_line == None:
                     while True:
                         try:
                             self.start_line = int(
@@ -372,13 +372,14 @@ class GeminiSRTTranslator:
 
             except FileNotFoundError:
                 translated_subtitle = original_subtitle.copy()
+                self.start_line = 1
 
             if len(original_subtitle) != len(translated_subtitle):
                 error(
                     f"Number of lines of existing translated file does not match the number of lines in the original file.",
                     ignore_quiet=True,
                 )
-                exit(0)
+                exit(1)
 
             translated_file = open(self.output_file, "w", encoding="utf-8")
 
@@ -386,7 +387,7 @@ class GeminiSRTTranslator:
                 error(
                     f"Start line must be between 1 and {len(original_subtitle)}. Please try again.", ignore_quiet=True
                 )
-                exit(0)
+                exit(1)
 
             if len(original_subtitle) < self.batch_size:
                 self.batch_size = len(original_subtitle)
@@ -599,7 +600,7 @@ class GeminiSRTTranslator:
                             info_with_progress("Sending last batch again...", isSending=True)
                         else:
                             i += last_chunk_size
-                            info_with_progress(f"Resuming from line {i+1}...", isSending=True)
+                            info_with_progress(f"Resuming from line {i}...", isSending=True)
                         if self.progress_log:
                             save_logs_to_file(self.log_file_path)
 
@@ -750,25 +751,26 @@ class GeminiSRTTranslator:
                     if chunk.prompt_feedback:
                         blocked = True
                         break
-                    for part in chunk.candidates[0].content.parts:
-                        if not part.text:
-                            continue
-                        elif part.thought:
-                            update_loading_animation(chunk_size=chunk_size, isThinking=True)
-                            thoughts_text += part.text
-                            continue
-                        else:
-                            if not done_thinking and self.thoughts_log and self.thinking:
-                                if retry == 0:
-                                    info_with_progress(f"Batch {self.batch_number} thinking process saved to file.")
-                                else:
-                                    info_with_progress(
-                                        f"Batch {self.batch_number}.{retry} thinking process saved to file."
-                                    )
-                                save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
-                                done_thinking = True
-                            response_text += part.text
-                    self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text)
+                    if chunk.candidates[0].content.parts:
+                        for part in chunk.candidates[0].content.parts:
+                            if not part.text:
+                                continue
+                            elif part.thought:
+                                update_loading_animation(chunk_size=chunk_size, isThinking=True)
+                                thoughts_text += part.text
+                                continue
+                            else:
+                                if not done_thinking and self.thoughts_log and self.thinking:
+                                    if retry == 0:
+                                        info_with_progress(f"Batch {self.batch_number} thinking process saved to file.")
+                                    else:
+                                        info_with_progress(
+                                            f"Batch {self.batch_number}.{retry} thinking process saved to file."
+                                        )
+                                    save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
+                                    done_thinking = True
+                                response_text += part.text
+                                self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text)
                     chunk_size = len(self.translated_batch)
                     if chunk_size == 0:
                         continue

@@ -98,31 +98,38 @@ def cmd_translate(args) -> None:
         gst.description = args.description
     if args.batch_size:
         gst.batch_size = args.batch_size
-    if args.temperature is not None:
+    if args.temperature:
         gst.temperature = args.temperature
-    if args.top_p is not None:
+    if args.top_p:
         gst.top_p = args.top_p
-    if args.top_k is not None:
+    if args.top_k:
         gst.top_k = args.top_k
-    if args.thinking_budget is not None:
+    if args.thinking_budget:
         gst.thinking_budget = args.thinking_budget
 
     # Set boolean flags
-    gst.streaming = not args.no_streaming
-    gst.thinking = not args.no_thinking
-    gst.free_quota = not args.paid_quota
-    gst.skip_upgrade = args.skip_upgrade
-    gst.use_colors = not args.no_colors
-    gst.progress_log = args.progress_log
-    gst.thoughts_log = args.thoughts_log
-    gst.quiet = args.quiet
-    if args.resume is not None:
+    if args.no_streaming:
+        gst.streaming = not args.no_streaming
+    if args.no_thinking:
+        gst.thinking = not args.no_thinking
+    if args.paid_quota:
+        gst.free_quota = not args.paid_quota
+    if args.skip_upgrade:
+        gst.skip_upgrade = args.skip_upgrade
+    if args.no_colors:
+        gst.use_colors = not args.no_colors
+    if args.progress_log:
+        gst.progress_log = args.progress_log
+    if args.thoughts_log:
+        gst.thoughts_log = args.thoughts_log
+    if args.quiet:
+        gst.quiet = args.quiet
+    if args.resume:
         gst.resume = args.resume
 
     # Execute translation
     try:
         gst.translate()
-        success("Translation completed successfully!")
     except Exception as e:
         error(f"Translation failed: {e}")
         sys.exit(1)
@@ -195,11 +202,9 @@ Examples:
     translate_parser.add_argument("-k2", "--api-key2", help="Secondary Gemini API key for additional quota")
     translate_parser.add_argument("-o", "--output-file", help="Output file path")
     translate_parser.add_argument("-a", "--audio-file", help="Audio file for context")
-    translate_parser.add_argument("--extract-audio", action="store_true", help="Extract audio from video for context")
     translate_parser.add_argument("-s", "--start-line", type=int, help="Starting line number")
     translate_parser.add_argument("-d", "--description", help="Description for translation context")
     translate_parser.add_argument("-m", "--model", help="Gemini model to use")
-    translate_parser.add_argument("--interactive", action="store_true", help="Interactive model selection")
     translate_parser.add_argument("-b", "--batch-size", type=int, help="Batch size for translation")
     translate_parser.add_argument("--temperature", type=float, help="Temperature (0.0-2.0)")
     translate_parser.add_argument("--top-p", type=float, help="Top P (0.0-1.0)")
@@ -207,18 +212,24 @@ Examples:
     translate_parser.add_argument("--thinking-budget", type=int, help="Thinking budget (0-24576)")
 
     # Boolean flags
-    translate_parser.add_argument("--no-streaming", action="store_true", help="Disable streaming")
-    translate_parser.add_argument("--no-thinking", action="store_true", help="Disable thinking mode")
-    translate_parser.add_argument(
-        "--paid-quota", action="store_true", help="Remove artificial limits for paid quota users"
-    )
-    translate_parser.add_argument("--skip-upgrade", action="store_true", help="Skip upgrade check")
-    translate_parser.add_argument("--no-colors", action="store_true", help="Disable colored output")
-    translate_parser.add_argument("--progress-log", action="store_true", help="Enable progress logging")
-    translate_parser.add_argument("--thoughts-log", action="store_true", help="Enable thoughts logging")
-    translate_parser.add_argument("--quiet", action="store_true", help="Suppress output")
-    translate_parser.add_argument("--resume", action="store_true", help="Resume interrupted translation")
+    translate_parser.add_argument("--no-streaming", action="store_true", default=None, help="Disable streaming")
+    translate_parser.add_argument("--no-thinking", action="store_true", default=None, help="Disable thinking mode")
+    translate_parser.add_argument("--skip-upgrade", action="store_true", default=None, help="Skip upgrade check")
+    translate_parser.add_argument("--no-colors", action="store_true", default=None, help="Disable colored output")
+    translate_parser.add_argument("--progress-log", action="store_true", default=None, help="Enable progress logging")
+    translate_parser.add_argument("--thoughts-log", action="store_true", default=None, help="Enable thoughts logging")
+    translate_parser.add_argument("--quiet", action="store_true", default=None, help="Suppress output")
+    translate_parser.add_argument("--resume", action="store_true", default=None, help="Resume interrupted translation")
     translate_parser.add_argument("--no-resume", dest="resume", action="store_false", help="Start from beginning")
+    translate_parser.add_argument(
+        "--paid-quota", action="store_true", default=None, help="Remove artificial limits for paid quota users"
+    )
+    translate_parser.add_argument(
+        "--interactive", action="store_true", default=None, help="Interactive model selection"
+    )
+    translate_parser.add_argument(
+        "--extract-audio", action="store_true", default=None, help="Extract audio from video for context"
+    )
 
     # List models command
     list_parser = subparsers.add_parser("list-models", help="List available Gemini models")

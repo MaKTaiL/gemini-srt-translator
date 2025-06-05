@@ -96,7 +96,6 @@ You can provide your API key in several ways:
 
    ```bash
    gst translate -i subtitle.srt -l French -k YOUR_API_KEY
-   gst translate -v movie.mp4 -l Spanish -k YOUR_API_KEY
    ```
 
 3. **Interactive Prompt**: The tool will prompt you if no key is found
@@ -296,6 +295,18 @@ gst.listmodels()
 
 ---
 
+## 🎨 Unofficial GUI Application
+
+**Great news!** Thanks to the amazing work of [@dane-9](https://github.com/dane-9), there's now a beautiful GUI application available for this project!
+
+If you prefer a user-friendly graphical interface over command-line usage, be sure to check out:
+
+**[🔗 Gemini SRT Translator GUI](https://github.com/dane-9/gemini-srt-translator-gui)**
+
+Perfect for users who want the same powerful translation capabilities with an intuitive visual interface!
+
+---
+
 ## 📝 License
 
 Distributed under the MIT License. See the [LICENSE](https://github.com/MaKTaiL/gemini-srt-translator?tab=MIT-1-ov-file) file for details.
@@ -313,5 +324,3 @@ Thank you to all who have contributed to this project:
 - [mkaflowski](https://github.com/mkaflowski)
 
 Special thanks to all users who have reported issues, suggested features, and helped improve the project.
-
----

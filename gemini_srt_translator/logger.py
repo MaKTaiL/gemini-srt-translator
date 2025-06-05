@@ -136,7 +136,7 @@ def input_prompt(message: Any, mode: str, max_length: int = 0) -> str:
         if mode == "line":
             if int(_line_number) < 1 or int(_line_number) > max_length:
                 error(f"Line number must be between 1 and {max_length}, got {int(_line_number)}", ignore_quiet=True)
-                exit(0)
+                exit(1)
             else:
                 return _line_number
     if _use_colors and Color.supports_color():
