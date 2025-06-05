@@ -97,21 +97,47 @@ def upgrade_package(package_name, use_colors=True):
             progress_thread.start()
 
             try:
-                # Run pip install with stderr redirected to suppress pip update notifications
-                subprocess.run(
-                    [
-                        sys.executable,
-                        "-m",
-                        "pip",
-                        "install",
-                        "--upgrade",
-                        package_name,
-                        "--quiet",
-                        "--disable-pip-version-check",
-                    ],
-                    check=True,
-                    stderr=subprocess.DEVNULL,
-                )
+                # Try to use 'uv' if available, otherwise fallback to pip
+                try:
+                    subprocess.run(
+                        ["uv", "--version"],
+                        check=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    use_uv = True
+                except Exception:
+                    use_uv = False
+
+                if use_uv:
+                    subprocess.run(
+                        [
+                            "uv",
+                            "pip",
+                            "install",
+                            "--upgrade",
+                            package_name,
+                            "--quiet",
+                            "--disable-pip-version-check",
+                        ],
+                        check=True,
+                        stderr=subprocess.DEVNULL,
+                    )
+                else:
+                    subprocess.run(
+                        [
+                            sys.executable,
+                            "-m",
+                            "pip",
+                            "install",
+                            "--upgrade",
+                            package_name,
+                            "--quiet",
+                            "--disable-pip-version-check",
+                        ],
+                        check=True,
+                        stderr=subprocess.DEVNULL,
+                    )
             finally:
                 # Stop the progress bar
                 stop_progress.set()

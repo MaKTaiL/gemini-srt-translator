@@ -9,6 +9,8 @@ _use_colors = True
 _loading_bars = ["—", "\\", "|", "/"]
 _loading_bars_index = -1
 _thoughts_list = []
+_quiet_mode = False
+_line_number = "1"
 
 
 class Color(Enum):
@@ -54,56 +56,89 @@ def set_color_mode(enabled: bool) -> None:
     _use_colors = enabled
 
 
-def info(message: Any) -> None:
+def set_quiet_mode(enabled: bool) -> None:
+    """Set whether to suppress all output"""
+    global _quiet_mode
+    _quiet_mode = enabled
+
+
+def set_line_number(line_number: str) -> None:
+    """Set the line number for input prompts"""
+    global _line_number
+    _line_number = line_number
+
+
+def info(message: Any, ignore_quiet: bool = False) -> None:
     """Print an information message in cyan color"""
+    if _quiet_mode and not ignore_quiet:
+        return
     if _use_colors and Color.supports_color():
         print(f"{Color.CYAN.value}{message}{Color.RESET.value}")
     else:
         print(message)
 
 
-def warning(message: Any) -> None:
+def warning(message: Any, ignore_quiet: bool = False) -> None:
     """Print a warning message in yellow color"""
+    if _quiet_mode and not ignore_quiet:
+        return
     if _use_colors and Color.supports_color():
         print(f"{Color.YELLOW.value}{message}{Color.RESET.value}")
     else:
         print(message)
 
 
-def error(message: Any) -> None:
+def error(message: Any, ignore_quiet: bool = False) -> None:
     """Print an error message in red color"""
+    if _quiet_mode and not ignore_quiet:
+        return
     if _use_colors and Color.supports_color():
         print(f"{Color.RED.value}{message}{Color.RESET.value}")
     else:
         print(message)
 
 
-def success(message: Any) -> None:
+def success(message: Any, ignore_quiet: bool = False) -> None:
     """Print a success message in green color"""
+    if _quiet_mode and not ignore_quiet:
+        return
     if _use_colors and Color.supports_color():
         print(f"{Color.GREEN.value}{message}{Color.RESET.value}")
     else:
         print(message)
 
 
-def progress(message: Any) -> None:
+def progress(message: Any, ignore_quiet: bool = False) -> None:
     """Print a progress/status update message in blue color"""
+    if _quiet_mode and not ignore_quiet:
+        return
     if _use_colors and Color.supports_color():
         print(f"{Color.BLUE.value}{message}{Color.RESET.value}")
     else:
         print(message)
 
 
-def highlight(message: Any) -> None:
+def highlight(message: Any, ignore_quiet: bool = False) -> None:
     """Print an important message in magenta color"""
+    if _quiet_mode and not ignore_quiet:
+        return
     if _use_colors and Color.supports_color():
         print(f"{Color.MAGENTA.value}{Color.BOLD.value}{message}{Color.RESET.value}")
     else:
         print(message)
 
 
-def input_prompt(message: Any) -> str:
+def input_prompt(message: Any, mode: str, max_length: int = 0) -> str:
     """Display a colored input prompt and return user input"""
+    if _quiet_mode:
+        if mode == "resume":
+            return "y"
+        if mode == "line":
+            if int(_line_number) < 1 or int(_line_number) > max_length:
+                error(f"Line number must be between 1 and {max_length}, got {int(_line_number)}", ignore_quiet=True)
+                exit(1)
+            else:
+                return _line_number
     if _use_colors and Color.supports_color():
         return input(f"{Color.WHITE.value}{Color.BOLD.value}{message}{Color.RESET.value}")
     else:
@@ -200,16 +235,17 @@ def progress_bar(
         lines_to_clear += msg_lines
 
     # Handle the clearing of lines
-    if _has_started:
-        # Move cursor to beginning of line
-        sys.stdout.write("\r")
+    if not _quiet_mode:
+        if _has_started:
+            # Move cursor to beginning of line
+            sys.stdout.write("\r")
 
-        # Clear each line individually by moving up and clearing
-        for _ in range(lines_to_clear):
-            sys.stdout.write("\033[F")  # Move up one line
-            sys.stdout.write("\033[K")  # Clear the line
-    else:
-        _has_started = True
+            # Clear each line individually by moving up and clearing
+            for _ in range(lines_to_clear):
+                sys.stdout.write("\033[F")  # Move up one line
+                sys.stdout.write("\033[K")  # Clear the line
+        else:
+            _has_started = True
 
     # Apply colors if enabled
     if _use_colors and Color.supports_color():
@@ -221,11 +257,15 @@ def progress_bar(
             )
         progress_text = f"{Color.BLUE.value}{progress_text}{Color.RESET.value}"
 
-    sys.stdout.write(progress_text)
-    sys.stdout.write("\n\n")
+    if not _quiet_mode:
+        sys.stdout.write(progress_text)
+        sys.stdout.write("\n\n")
 
     if len(_previous_messages) > 0 and "waiting" in _previous_messages[-1]["message"].lower():
         _previous_messages.pop()
+
+    if _quiet_mode:
+        return
 
     for i in range(len(_previous_messages)):
         if _use_colors and Color.supports_color():
@@ -233,7 +273,10 @@ def progress_bar(
             sys.stdout.write(f"{color_code}{_previous_messages[i]['message']}{Color.RESET.value}\n")
         else:
             sys.stdout.write(_previous_messages[i]["message"] + "\n")
+
     if message:
+        if not isPrompt:
+            _previous_messages.append({"message": message, "color": message_color})
         if _use_colors and Color.supports_color():
             color_code = message_color.value if message_color else Color.YELLOW.value
             if isPrompt:
@@ -241,7 +284,6 @@ def progress_bar(
                 user_prompt = input()
                 sys.stdout.write("\033[F" + " " * terminal_width + "\r")
             else:
-                _previous_messages.append({"message": message, "color": message_color})
                 sys.stdout.write(f"{color_code}{message}{Color.RESET.value}" + "\n")
         else:
             if isPrompt:
@@ -249,7 +291,6 @@ def progress_bar(
                 user_prompt = input()
                 sys.stdout.write("\033[F" + " " * terminal_width + "\r")
             else:
-                _previous_messages.append({"message": message, "color": message_color})
                 sys.stdout.write(message + "\n")
     sys.stdout.flush()
     return user_prompt if isPrompt else None
@@ -257,6 +298,8 @@ def progress_bar(
 
 def info_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
     """Update the progress bar with an info message"""
+    if _quiet_mode:
+        return
     progress_bar(
         **_last_progress,
         message=message,
@@ -268,6 +311,8 @@ def info_with_progress(message: Any, chunk_size: int = 0, isSending: bool = Fals
 
 def warning_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
     """Update the progress bar with a warning message"""
+    if _quiet_mode:
+        return
     progress_bar(
         **_last_progress,
         message=message,
@@ -279,6 +324,8 @@ def warning_with_progress(message: Any, chunk_size: int = 0, isSending: bool = F
 
 def error_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
     """Update the progress bar with an error message"""
+    if _quiet_mode:
+        return
     progress_bar(
         **_last_progress,
         message=message,
@@ -290,6 +337,8 @@ def error_with_progress(message: Any, chunk_size: int = 0, isSending: bool = Fal
 
 def success_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
     """Update the progress bar with a success message"""
+    if _quiet_mode:
+        return
     progress_bar(
         **_last_progress,
         message=message,
@@ -301,6 +350,8 @@ def success_with_progress(message: Any, chunk_size: int = 0, isSending: bool = F
 
 def highlight_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
     """Update the progress bar with a highlighted message"""
+    if _quiet_mode:
+        return
     progress_bar(
         **_last_progress,
         message=message,
@@ -310,14 +361,18 @@ def highlight_with_progress(message: Any, chunk_size: int = 0, isSending: bool =
     )
 
 
-def input_prompt_with_progress(message: Any) -> str:
+def input_prompt_with_progress(message: Any, batch_size: int) -> str:
     """Update the progress bar with an input prompt message"""
+    if _quiet_mode:
+        return f"{max(1, batch_size - 50)}"
     return progress_bar(**_last_progress, message=message, message_color=Color.WHITE, isPrompt=True)
 
 
 def update_loading_animation(chunk_size: int = 0, isThinking: bool = False) -> None:
     """Update the loading animation in the progress bar"""
     global _loading_bars_index
+    if _quiet_mode:
+        return
     _loading_bars_index = (_loading_bars_index + 1) % len(_loading_bars)
     progress_bar(
         **_last_progress,
