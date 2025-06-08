@@ -71,7 +71,7 @@ def cmd_translate(args) -> None:
             sys.exit(1)
         gst.video_file = args.video_file
     else:
-        error("Either --input-file or --video-file must be provided.")
+        error("Either --input-file and/or --video-file must be provided.")
         sys.exit(1)
 
     # Set target language
@@ -131,7 +131,6 @@ def cmd_translate(args) -> None:
     try:
         gst.translate()
     except Exception as e:
-        error(f"Translation failed: {e}")
         sys.exit(1)
 
 
@@ -191,9 +190,8 @@ Examples:
 
     # Required arguments group
     required_group = translate_parser.add_argument_group("required arguments")
-    input_group = translate_parser.add_mutually_exclusive_group(required=True)
-    input_group.add_argument("-i", "--input-file", help="Input SRT file path")
-    input_group.add_argument("-v", "--video-file", help="Video file path (for SRT extraction)")
+    required_group.add_argument("-i", "--input-file", help="Input SRT file path")
+    required_group.add_argument("-v", "--video-file", help="Video file path (for SRT/Audio extraction)")
 
     translate_parser.add_argument("-l", "--target-language", help="Target language for translation")
     translate_parser.add_argument("-k", "--api-key", help="Gemini API key")

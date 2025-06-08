@@ -282,14 +282,16 @@ def progress_bar(
             if isPrompt:
                 sys.stdout.write(f"{color_code}{Color.BOLD.value}{message}{Color.RESET.value}")
                 user_prompt = input()
-                sys.stdout.write("\033[F" + " " * terminal_width + "\r")
+                sys.stdout.write("\033[F")
+                sys.stdout.write("\033[K")
             else:
                 sys.stdout.write(f"{color_code}{message}{Color.RESET.value}" + "\n")
         else:
             if isPrompt:
                 sys.stdout.write(message)
                 user_prompt = input()
-                sys.stdout.write("\033[F" + " " * terminal_width + "\r")
+                sys.stdout.write("\033[F")
+                sys.stdout.write("\033[K")
             else:
                 sys.stdout.write(message + "\n")
     sys.stdout.flush()
