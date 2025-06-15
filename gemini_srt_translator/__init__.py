@@ -247,8 +247,4 @@ def translate():
     # Filter out None values
     filtered_params = {k: v for k, v in params.items() if v is not None}
     translator = GeminiSRTTranslator(**filtered_params)
-    try:
-        translator.translate()
-    except Exception as e:
-        error(f"{e.message}", ignore_quiet=True)
-        exit(1)
+    translator.translate()
