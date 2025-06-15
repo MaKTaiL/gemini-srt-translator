@@ -31,7 +31,7 @@
 
 import os
 
-from .logger import set_quiet_mode, warning
+from .logger import set_quiet_mode, error
 from .main import GeminiSRTTranslator
 from .utils import upgrade_package
 
@@ -250,5 +250,5 @@ def translate():
     try:
         translator.translate()
     except Exception as e:
-        warning(f"{e.message}", ignore_quiet=True)
+        error(f"{e.message}", ignore_quiet=True)
         exit(1)
