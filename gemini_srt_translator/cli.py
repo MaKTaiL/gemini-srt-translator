@@ -66,11 +66,11 @@ def cmd_translate(args) -> None:
         if not validate_file_path(args.input_file, ".srt"):
             sys.exit(1)
         gst.input_file = args.input_file
-    elif args.video_file:
+    if args.video_file:
         if not validate_file_path(args.video_file):
             sys.exit(1)
         gst.video_file = args.video_file
-    else:
+    if not args.input_file and not args.video_file:
         error("Either --input-file and/or --video-file must be provided.")
         sys.exit(1)
 
