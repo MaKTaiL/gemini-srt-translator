@@ -31,7 +31,7 @@
 
 import os
 
-from .logger import set_quiet_mode
+from .logger import set_quiet_mode, warning
 from .main import GeminiSRTTranslator
 from .utils import upgrade_package
 
@@ -247,4 +247,8 @@ def translate():
     # Filter out None values
     filtered_params = {k: v for k, v in params.items() if v is not None}
     translator = GeminiSRTTranslator(**filtered_params)
-    translator.translate()
+    try:
+        translator.translate()
+    except Exception as e:
+        warning(f"{e.message}", ignore_quiet=True)
+        exit(1)
