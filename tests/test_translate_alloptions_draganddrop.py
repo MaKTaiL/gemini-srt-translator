@@ -1,8 +1,11 @@
-import gemini_srt_translator as gst
-import os
 import getpass
+import os
 
-# Set the API key for the Gemini service
+import gemini_srt_translator as gst
+
+# Set the API key for the Gemini service - check environment first
+gst.gemini_api_key = os.getenv("GEMINI_API_KEY")
+gst.gemini_api_key2 = os.getenv("GEMINI_API_KEY2")
 
 if not gst.gemini_api_key and not gst.gemini_api_key2:
     input_gemini_api_key = getpass.getpass("\033[96mEnter your Gemini API key: \033[0m").strip()
@@ -25,6 +28,7 @@ if target_language:
 # List of available models
 available_models = gst.getmodels()
 
+
 # Display options and select the model
 def select_model():
     print()
@@ -32,7 +36,7 @@ def select_model():
     for i, model in enumerate(available_models, 1):
         print(f"\033[92m{i}. \033[93m{model}\033[0m")
     print()
-    
+
     while True:
         try:
             choice = int(input("\033[96mEnter the desired model number: \033[0m"))
@@ -44,6 +48,7 @@ def select_model():
                 print("\033[31m[ERROR] Invalid choice. Please try again.\033[0m")
         except ValueError:
             print("\033[31m[ERROR] Please enter a valid number.\033[0m")
+
 
 # Select and store the chosen model
 selected_model = select_model()
@@ -65,7 +70,7 @@ print(f"\033[91mTranslating the file. Model used: ”\033[92m{selected_model}\03
 print()
 gst.translate()
 if os.path.exists(gst.output_file):
-    with open(gst.output_file, 'a') as f:
+    with open(gst.output_file, "a") as f:
         f.flush()
         os.fsync(f.fileno())
 
