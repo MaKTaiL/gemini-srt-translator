@@ -31,7 +31,7 @@
 
 import os
 
-from .logger import set_quiet_mode, error
+from .logger import set_quiet_mode
 from .main import GeminiSRTTranslator
 from .utils import upgrade_package
 
