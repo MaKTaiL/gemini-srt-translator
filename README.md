@@ -299,8 +299,8 @@ gst.listmodels()
 
 If you prefer a user-friendly graphical interface over command-line usage, be sure to check out:
 
-- **[🔗 Gemini SRT Translator GUI (by @mkaflowski)](https://github.com/mkaflowski/Gemini-SRT-translator-GUI)**
-- **[🔗 Gemini SRT Translator GUI (by @dane-9)](https://github.com/dane-9/gemini-srt-translator-gui)**
+- **[🔗 Gemini SRT Translator GUI](https://github.com/mkaflowski/Gemini-SRT-translator-GUI) (by @mkaflowski)**
+- **[🔗 Gemini SRT Translator GUI](https://github.com/dane-9/gemini-srt-translator-gui) (by @dane-9)**
 
 Perfect for users who want the same powerful translation capabilities with an intuitive visual interface!
 
