@@ -130,7 +130,6 @@ def cmd_translate(args) -> None:
     # Execute translation
     try:
         gst.translate()
-        success("Translation completed successfully!")
     except Exception as e:
         error(f"Translation failed: {e}")
         sys.exit(1)

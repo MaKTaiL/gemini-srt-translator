@@ -4,6 +4,7 @@ traduzir.py
 *.progress
 *.log
 *.mp3
+*.mp4
 *.mkv
 
 # Virtual environment
