@@ -1,8 +1,11 @@
 import os
 import shutil
 import sys
+from datetime import timedelta
 from enum import Enum
 from typing import Any
+
+import srt
 
 # Global variable to control color output
 _use_colors = True
@@ -128,7 +131,7 @@ def highlight(message: Any, ignore_quiet: bool = False) -> None:
         print(message)
 
 
-def input_prompt(message: Any, mode: str, max_length: int = 0) -> str:
+def input_prompt(message: Any, mode: str = None, max_length: int = 0) -> str:
     """Display a colored input prompt and return user input"""
     if _quiet_mode:
         if mode == "resume":
@@ -164,6 +167,7 @@ def progress_bar(
     isLoading: bool = False,
     isSending: bool = False,
     isThinking: bool = False,
+    isTranscribing: bool = False,
     chunk_size: int = 0,
 ) -> None:
     """
@@ -199,7 +203,12 @@ def progress_bar(
     filled_length = int(bar_length * progress_ratio)
     bar = "█" * filled_length + "░" * (bar_length - filled_length)
     percentage = int(100 * progress_ratio)
-    progress_text = f"{prefix} |{bar}| {percentage}% ({current + chunk_size}/{total})"
+    if not isTranscribing:
+        progress_text = f"{prefix} |{bar}| {percentage}% ({current + chunk_size}/{total})"
+    else:
+        current_text = srt.timedelta_to_srt_timestamp(timedelta(seconds=current + chunk_size))
+        total_text = srt.timedelta_to_srt_timestamp(timedelta(seconds=total))
+        progress_text = f"{prefix} |{bar}| {percentage}% ({current_text}/{total_text})"
     # Format the progress bar line
     if suffix:
         progress_text = f"{progress_text} {suffix}"
@@ -298,7 +307,9 @@ def progress_bar(
     return user_prompt if isPrompt else None
 
 
-def info_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
+def info_with_progress(
+    message: Any, chunk_size: int = 0, isSending: bool = False, isTranscribing: bool = False
+) -> None:
     """Update the progress bar with an info message"""
     if _quiet_mode:
         return
@@ -308,10 +319,13 @@ def info_with_progress(message: Any, chunk_size: int = 0, isSending: bool = Fals
         message_color=Color.CYAN,
         chunk_size=chunk_size,
         isSending=isSending,
+        isTranscribing=isTranscribing,
     )
 
 
-def warning_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
+def warning_with_progress(
+    message: Any, chunk_size: int = 0, isSending: bool = False, isTranscribing: bool = False
+) -> None:
     """Update the progress bar with a warning message"""
     if _quiet_mode:
         return
@@ -321,10 +335,13 @@ def warning_with_progress(message: Any, chunk_size: int = 0, isSending: bool = F
         message_color=Color.YELLOW,
         chunk_size=chunk_size,
         isSending=isSending,
+        isTranscribing=isTranscribing,
     )
 
 
-def error_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
+def error_with_progress(
+    message: Any, chunk_size: int = 0, isSending: bool = False, isTranscribing: bool = False
+) -> None:
     """Update the progress bar with an error message"""
     if _quiet_mode:
         return
@@ -334,10 +351,13 @@ def error_with_progress(message: Any, chunk_size: int = 0, isSending: bool = Fal
         message_color=Color.RED,
         chunk_size=chunk_size,
         isSending=isSending,
+        isTranscribing=isTranscribing,
     )
 
 
-def success_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
+def success_with_progress(
+    message: Any, chunk_size: int = 0, isSending: bool = False, isTranscribing: bool = False
+) -> None:
     """Update the progress bar with a success message"""
     if _quiet_mode:
         return
@@ -347,10 +367,13 @@ def success_with_progress(message: Any, chunk_size: int = 0, isSending: bool = F
         message_color=Color.GREEN,
         chunk_size=chunk_size,
         isSending=isSending,
+        isTranscribing=isTranscribing,
     )
 
 
-def highlight_with_progress(message: Any, chunk_size: int = 0, isSending: bool = False) -> None:
+def highlight_with_progress(
+    message: Any, chunk_size: int = 0, isSending: bool = False, isTranscribing: bool = False
+) -> None:
     """Update the progress bar with a highlighted message"""
     if _quiet_mode:
         return
@@ -360,17 +383,20 @@ def highlight_with_progress(message: Any, chunk_size: int = 0, isSending: bool =
         message_color=Color.MAGENTA,
         chunk_size=chunk_size,
         isSending=isSending,
+        isTranscribing=isTranscribing,
     )
 
 
-def input_prompt_with_progress(message: Any, batch_size: int) -> str:
+def input_prompt_with_progress(message: Any, batch_size: int, isTranscribing: bool = False) -> str:
     """Update the progress bar with an input prompt message"""
     if _quiet_mode:
         return f"{max(1, batch_size - 50)}"
-    return progress_bar(**_last_progress, message=message, message_color=Color.WHITE, isPrompt=True)
+    return progress_bar(
+        **_last_progress, message=message, message_color=Color.WHITE, isPrompt=True, isTranscribing=isTranscribing
+    )
 
 
-def update_loading_animation(chunk_size: int = 0, isThinking: bool = False) -> None:
+def update_loading_animation(chunk_size: int = 0, isThinking: bool = False, isTranscribing: bool = False) -> None:
     """Update the loading animation in the progress bar"""
     global _loading_bars_index
     if _quiet_mode:
@@ -382,6 +408,7 @@ def update_loading_animation(chunk_size: int = 0, isThinking: bool = False) -> N
         message_color=None,
         isLoading=not isThinking,
         isThinking=isThinking,
+        isTranscribing=isTranscribing,
         chunk_size=chunk_size,
     )
 

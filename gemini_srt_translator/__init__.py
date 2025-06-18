@@ -30,6 +30,7 @@
 """
 
 import os
+from typing import Literal
 
 from .logger import set_quiet_mode
 from .main import GeminiSRTTranslator
@@ -42,7 +43,9 @@ input_file: str = None
 output_file: str = None
 video_file: str = None
 audio_file: str = None
+audio_chunk_size: int = None
 extract_audio: bool = None
+isolate_voice: bool = None
 start_line: int = None
 description: str = None
 model_name: str = None
@@ -144,8 +147,14 @@ def translate():
     # (Optional) Path to audio file for audio context
     gst.audio_file = "audio.mp3"
 
+    # (Optional) Audio chunk size for processing (default: 600 seconds)
+    gst.audio_chunk_size = 600
+
     # (Optional) Whether to extract and use audio context from video file
     gst.extract_audio = False
+
+    # (Optional) Whether to isolate voice from the audio context
+    gst.isolate_voice = False
 
     # (Optional) Path to save the translated subtitle file
     gst.output_file = "translated_subtitle.srt"
@@ -156,8 +165,8 @@ def translate():
     # (Optional) Additional description of the translation task
     gst.description = "This subtitle is from a TV Series called 'Friends'."
 
-    # (Optional) Model name to use for translation (default: "gemini-2.5-flash-preview-05-20")
-    gst.model_name = "gemini-2.5-flash-preview-05-20"
+    # (Optional) Model name to use for translation (default: "gemini-2.5-flash")
+    gst.model_name = "gemini-2.5-flash"
 
     # (Optional) Batch size for translation (default: 300)
     gst.batch_size = 300
@@ -216,7 +225,9 @@ def translate():
         "output_file": output_file,
         "video_file": video_file,
         "audio_file": audio_file,
+        "audio_chunk_size": audio_chunk_size,
         "extract_audio": extract_audio,
+        "isolate_voice": isolate_voice,
         "start_line": start_line,
         "description": description,
         "model_name": model_name,
@@ -248,3 +259,105 @@ def translate():
     filtered_params = {k: v for k, v in params.items() if v is not None}
     translator = GeminiSRTTranslator(**filtered_params)
     translator.translate()
+
+
+def extract(type: Literal["audio", "srt"]):
+    """
+    ## Extracts audio or subtitles (SRT) from a video file.
+        This function extracts either the audio or the subtitles from the specified video file.
+        The extraction is done using FFmpeg.
+
+    Args:
+        type (str): The type of extraction. Must be "audio" or "srt".
+
+    Example:
+    ```
+    import gemini_srt_translator as gst
+
+    # Path to the video file
+    gst.video_file = "movie.mkv"
+
+    # (Optional) Whether to isolate voice from the audio context
+    gst.isolate_voice = True
+
+    # Extract audio
+    gst.extract("audio")
+
+    # Extract subtitles
+    gst.extract("srt")
+    ```
+
+    Raises:
+        Exception: If the video file is not provided.
+        ValueError: If the type is not "audio" or "srt".
+    """
+
+    params = {
+        "video_file": video_file,
+        "isolate_voice": isolate_voice,
+        "use_colors": use_colors,
+    }
+
+    if params["isolate_voice"] is None:
+        params["isolate_voice"] = False
+    filtered_params = {k: v for k, v in params.items() if v is not None}
+    translator = GeminiSRTTranslator(**filtered_params)
+    if type == "audio":
+        translator.extract("audio")
+    elif type == "srt":
+        translator.extract("srt")
+    else:
+        raise ValueError("Invalid extraction type. Must be 'audio' or 'srt'.")
+
+
+def transcribe():
+    """
+    ## Transcribes audio from a video file using the Gemini API.
+        This function configures the genai library with the provided Gemini API key
+        and transcribes the audio from the video file to a subtitle file.
+
+    Example:
+    ```
+    import gemini_srt_translator as gst
+
+    # Your Gemini API key
+    gst.gemini_api_key = "your_gemini_api_key_here"
+
+    # Path to the audio file to transcribe
+    gst.audio_file = "audio.mp3"
+
+    # (Optional) Path to save the transcription output
+    gst.output_file = "transcription.srt"
+
+    gst.transcribe()
+    ```
+
+    Raises:
+        Exception: If the Gemini API key is not provided.
+        Exception: If the audio file is not provided.
+    """
+
+    params = {
+        "gemini_api_key": gemini_api_key,
+        "video_file": video_file,
+        "audio_file": audio_file,
+        "model_name": model_name,
+        "description": description,
+        "audio_chunk_size": audio_chunk_size,
+        "output_file": output_file,
+        "streaming": streaming,
+        "thinking": thinking,
+        "thinking_budget": thinking_budget,
+        "temperature": temperature,
+        "top_p": top_p,
+        "top_k": top_k,
+        "use_colors": use_colors,
+        "thoughts_log": thoughts_log,
+    }
+
+    if params["isolate_voice"] is None:
+        params["isolate_voice"] = False
+
+    filtered_params = {k: v for k, v in params.items() if v is not None}
+    translator = GeminiSRTTranslator(**filtered_params)
+    translator.transcribe()

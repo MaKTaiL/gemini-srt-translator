@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gemini-srt-translator"
-version = "2.1.2"
-description = "A tool to translate subtitles using Google Generative AI"
+version = "2.2.0a1"
+description = "A tool for translating subtitles using Google Gemini AI"
 readme = "README.md"
 license = "MIT"
 authors = [{ name = "Matheus Castro" }]
@@ -14,6 +14,8 @@ dependencies = [
   "srt==3.5.3",
   "json-repair==0.46.2",
   "packaging==25.0",
+  "pydub>=0.25.1",
+  "audioop-lts==0.2.1; python_version>='3.13'",
 ]
 classifiers = [
   "Development Status :: 5 - Production/Stable",

@@ -3,17 +3,12 @@ import subprocess
 import sys
 import threading
 import time
+from datetime import timedelta
 
 import requests
 from packaging import version
 
-from gemini_srt_translator.logger import (
-    highlight,
-    info,
-    input_prompt,
-    set_color_mode,
-    success,
-)
+from .logger import highlight, info, input_prompt, set_color_mode, success
 
 
 def get_installed_version(package_name):
@@ -148,3 +143,32 @@ def upgrade_package(package_name, use_colors=True):
             exit(0)
         else:
             info(f"{package_name} upgrade skipped.\n")
+
+
+def convert_timedelta_to_timestamp(td, offset=0):
+    """Converts a timedelta object to a string in the format MM:SS."""
+    if not isinstance(td, timedelta):
+        raise TypeError("Expected a timedelta object.")
+
+    total_seconds = td.seconds - offset
+    minutes, seconds = divmod(total_seconds, 60)
+
+    return f"{minutes:02}:{seconds:02}"
+
+
+def convert_timestamp_to_timedelta(timestamp, offset=0):
+    """Converts a timestamp string in the format MM:SS to a timedelta object."""
+    if not isinstance(timestamp, str):
+        raise TypeError("Expected a string in the format MM:SS.")
+
+    parts = timestamp.split(":")
+    if len(parts) != 2:
+        raise ValueError("Timestamp must be in the format MM:SS.")
+
+    try:
+        minutes = int(parts[0])
+        seconds = int(parts[1])
+    except ValueError:
+        raise ValueError("Minutes and seconds must be integers.")
+
+    return timedelta(minutes=minutes, seconds=seconds + offset)
