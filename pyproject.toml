@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gemini-srt-translator"
-version = "2.2.0a2"
+version = "2.2.0a3"
 description = "A tool for translating subtitles using Google Gemini AI"
 readme = "README.md"
 license = "MIT"
