@@ -368,6 +368,10 @@ def main() -> None:
             cmd_translate(args)
         elif args.command == "list-models":
             cmd_list_models(args)
+        elif args.command == "extract":
+            cmd_extract(args)
+        elif args.command == "transcribe":
+            cmd_transcribe(args)
     except KeyboardInterrupt:
         info("\nOperation cancelled by user.")
         sys.exit(1)
