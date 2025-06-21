@@ -344,6 +344,7 @@ def transcribe():
         "model_name": model_name,
         "description": description,
         "audio_chunk_size": audio_chunk_size,
+        "isolate_voice": isolate_voice,
         "output_file": output_file,
         "streaming": streaming,
         "thinking": thinking,
