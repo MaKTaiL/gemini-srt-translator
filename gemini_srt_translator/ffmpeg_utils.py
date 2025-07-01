@@ -18,7 +18,7 @@ def check_filter_availability(filter_name):
     """Check if a specific filter is available in the current FFmpeg build"""
     try:
         cmd = ["ffmpeg", "-hide_banner", "-filters"]
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, encoding="utf-8")
         return filter_name in result.stdout
     except subprocess.CalledProcessError:
         return False
@@ -44,7 +44,7 @@ def compress_audio(extracted_audio_path, target_size_mb=20):
 
         # Get audio duration - use extracted_audio_path instead of input_path
         cmd = ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", extracted_audio_path]
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, encoding="utf-8")
 
         # Check if we got valid output
         if not result.stdout.strip():
@@ -93,7 +93,7 @@ def compress_audio(extracted_audio_path, target_size_mb=20):
             compressed_path,
         ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, encoding="utf-8")
 
         # Verify the compressed file was created
         if not os.path.exists(compressed_path):
@@ -124,7 +124,7 @@ def compress_audio(extracted_audio_path, target_size_mb=20):
                 aggressive_path,
             ]
 
-            subprocess.run(cmd, capture_output=True, text=True, check=True)
+            subprocess.run(cmd, capture_output=True, text=True, check=True, encoding="utf-8")
 
             if os.path.exists(compressed_path):
                 os.remove(compressed_path)
@@ -173,7 +173,7 @@ def get_audio_info(video_path):
     """Get audio channel information from video file, selecting the primary audio stream"""
     try:
         cmd = ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams", "-select_streams", "a", video_path]
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, encoding="utf-8")
 
         data = json.loads(result.stdout)
 
@@ -302,7 +302,7 @@ def extract_audio(video_path, output_path, channels, channel_layout, stream_inde
     cmd.append(output_path)
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False, encoding="utf-8")
 
         if result.returncode != 0:
             # If the advanced filter fails, try with basic extraction only
@@ -334,7 +334,7 @@ def extract_audio_basic(video_path, output_path, channels, stream_index=0):
 
     cmd.append(output_path)
 
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, encoding="utf-8")
     return True
 
 
@@ -416,7 +416,7 @@ def extract_srt_from_video(video_path) -> str:
     cmd = ["ffmpeg", "-v", "quiet", "-i", video_path, "-map", "0:s:0", "-c:s", "srt", srt_path]
     try:
         info("Extracting subtitles from video file...")
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True, encoding="utf-8")
         return srt_path
     except subprocess.CalledProcessError as e:
         error(f"FFmpeg command failed: {e}")
@@ -429,7 +429,7 @@ def check_ffmpeg_installation():
     Returns True if FFmpeg is available, False otherwise.
     """
     try:
-        subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
+        subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True, encoding="utf-8")
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
