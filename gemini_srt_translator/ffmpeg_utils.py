@@ -14,7 +14,7 @@ from .logger import error, info, success, warning
 def _run_command(cmd, capture_output=True, text=True):
     """Runs a command-line utility, handling exceptions."""
     try:
-        result = subprocess.run(cmd, capture_output=capture_output, text=text, check=True)
+        result = subprocess.run(cmd, capture_output=capture_output, text=text, check=True, encoding="utf-8")
         return result
     except FileNotFoundError:
         error(f"Command '{cmd[0]}' not found. Please ensure FFmpeg is installed and in your PATH.")
@@ -224,7 +224,7 @@ def get_audio_length(audio_path: str) -> float:
         audio_path,
     ]
     try:
-        output = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        output = subprocess.run(cmd, capture_output=True, text=True, check=True, encoding="utf-8")
         return float(output.stdout.strip())
     except (subprocess.CalledProcessError, ValueError):
         return 0.0
