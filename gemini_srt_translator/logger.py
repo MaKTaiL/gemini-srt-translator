@@ -128,7 +128,7 @@ def highlight(message: Any, ignore_quiet: bool = False) -> None:
         print(message)
 
 
-def input_prompt(message: Any, mode: str, max_length: int = 0) -> str:
+def input_prompt(message: Any, mode: str = None, max_length: int = 0) -> str:
     """Display a colored input prompt and return user input"""
     if _quiet_mode:
         if mode == "resume":

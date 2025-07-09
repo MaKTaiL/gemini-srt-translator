@@ -7,13 +7,7 @@ import time
 import requests
 from packaging import version
 
-from gemini_srt_translator.logger import (
-    highlight,
-    info,
-    input_prompt,
-    set_color_mode,
-    success,
-)
+from .logger import highlight, info, input_prompt, set_color_mode, success
 
 
 def get_installed_version(package_name):
