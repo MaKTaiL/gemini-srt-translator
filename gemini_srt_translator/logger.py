@@ -258,13 +258,13 @@ def progress_bar(
 
     # Apply colors if enabled
     if _use_colors and Color.supports_color():
-        progress_text = progress_text.replace("█", f"{Color.GREEN.value}█{Color.BLUE.value}")
-        progress_text = progress_text.replace("↑", f"{Color.GREEN.value}↑{Color.BLUE.value}")
+        progress_text = progress_text.replace("█", f"{Color.GREEN.value}█{Color.YELLOW.value}")
+        progress_text = progress_text.replace("↑", f"{Color.GREEN.value}↑{Color.YELLOW.value}")
         for i in range(len(_loading_bars)):
             progress_text = progress_text.replace(
-                _loading_bars[i], f"{Color.GREEN.value}{_loading_bars[i]}{Color.BLUE.value}"
+                _loading_bars[i], f"{Color.GREEN.value}{_loading_bars[i]}{Color.YELLOW.value}"
             )
-        progress_text = f"{Color.BLUE.value}{progress_text}{Color.RESET.value}"
+        progress_text = f"{Color.YELLOW.value}{progress_text}{Color.RESET.value}"
 
     if not _quiet_mode:
         sys.stdout.write(progress_text)
