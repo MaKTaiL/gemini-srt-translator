@@ -645,6 +645,8 @@ class GeminiSRTTranslator:
                         j = i + last_chunk_size
                         parts_original = []
                         parts_translated = []
+                        offset = 0
+                        offset_end = 0
                         for k in range(i, max(i, j)):
                             subtitle_kwargs = {
                                 "index": str(k),
