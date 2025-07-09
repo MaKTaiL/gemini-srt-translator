@@ -95,7 +95,7 @@ def extract_audio_from_video(video_path, isolate_voice=False, target_mb=20):
         return output_path
 
     try:
-        info("Step 1: Analyzing audio properties...")
+        info("\033[93mStep 1: \033[94mAnalyzing audio properties...")
         props = get_audio_properties(video_path)
 
         # --- Build Filter Chain for Extraction ---
@@ -123,7 +123,7 @@ def extract_audio_from_video(video_path, isolate_voice=False, target_mb=20):
                     )
 
         # --- Extract to Temporary WAV File ---
-        info("Step 2: Extracting audio to a temporary WAV file...")
+        info("\033[93mStep 2: \033[94mExtracting audio to a temporary WAV file...")
         extract_cmd = [
             "ffmpeg",
             "-y",
@@ -141,7 +141,7 @@ def extract_audio_from_video(video_path, isolate_voice=False, target_mb=20):
         _run_command(extract_cmd)
 
         # --- Compress WAV to MP3 ---
-        info("Step 3: Compressing audio to MP3...")
+        info("\033[93mStep 3: \033[94mCompressing audio to MP3...")
         # Calculate bitrate in kbps to hit the target size. (Size in MB * 8192) / Duration in seconds.
         # Use a fudge factor (0.95) to account for metadata and overhead.
         target_bitrate_kbps = int((target_mb * 8192 * 0.95) / props["duration"])
@@ -162,9 +162,9 @@ def extract_audio_from_video(video_path, isolate_voice=False, target_mb=20):
         _run_command(compress_cmd)
 
         final_size = get_file_size_mb(output_path)
-        success("--- Success! ---")
-        success(f"Audio saved to: {output_path}")
-        success(f"Final file size: {final_size:.2f} MB")
+        success("\n--- Success! ---")
+        success(f"\033[96mAudio saved to: \033[92m{output_path}")
+        success(f"\033[96mFinal file size: \033[31m{final_size:.2f} MB\n")
         return output_path
 
     except (ValueError, subprocess.CalledProcessError) as e:
@@ -192,8 +192,8 @@ def extract_srt_from_video(video_path):
     try:
         info("Extracting subtitles...")
         _run_command(cmd)
-        success("--- Success! ---")
-        success(f"Subtitles saved to: {srt_path}")
+        success("\n--- Success! ---")
+        success(f"\033[96mSubtitles saved to:\033[92m {srt_path}")
         return srt_path
     except subprocess.CalledProcessError:
         warning("Could not find a subtitle stream in the video file.")
