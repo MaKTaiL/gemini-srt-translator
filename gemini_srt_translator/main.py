@@ -519,7 +519,7 @@ class GeminiSRTTranslator:
                 ]
 
             highlight(f"Starting translation of {total - self.start_line + 1} lines...\n")
-            progress_bar(i, total, prefix="Translating:", suffix=f"{self.model_name}", isSending=True)
+            progress_bar(i, total, prefix="Translating:", suffix=f"\033[31m{self.model_name}", isSending=True)
 
             if self.gemini_api_key2:
                 info_with_progress(f"Starting with API Key {self.current_api_number}")
@@ -617,7 +617,7 @@ class GeminiSRTTranslator:
                     offset = offset_end
 
                     # Update progress bar
-                    progress_bar(i, total, prefix="Translating:", suffix=f"{self.model_name}", isSending=True)
+                    progress_bar(i, total, prefix="Translating:", suffix=f"\033[31m{self.model_name}", isSending=True)
 
                     # Save progress after each batch
                     self._save_progress(i + 1)
@@ -675,7 +675,7 @@ class GeminiSRTTranslator:
                             i + max(0, last_chunk_size),
                             total,
                             prefix="Translating:",
-                            suffix=f"{self.model_name}",
+                            suffix=f"\033[31m{self.model_name}",
                         )
                         error_with_progress(f"{e_str}")
                         if not self.streaming or last_chunk_size == 0:
@@ -686,7 +686,7 @@ class GeminiSRTTranslator:
                         if self.progress_log:
                             save_logs_to_file(self.log_file_path)
 
-            success_with_progress("Translation completed successfully!")
+            success_with_progress("\n\033[96m✅ [SUCCES] \033[96mTranslation completed successfully!")
             if self.progress_log:
                 save_logs_to_file(self.log_file_path)
             translated_file.write(srt.compose(translated_subtitle, reindex=False, strict=False))
@@ -1047,12 +1047,12 @@ class GeminiSRTTranslator:
                     current_length,
                     audio_length,
                     prefix="Transcribing:",
-                    suffix=f"{self.model_name}",
+                    suffix=f"\033[31m{self.model_name}",
                     isSending=True,
                     isTranscribing=True,
                 )
                 info_with_progress(
-                    f"Transcribing audio segment {convert_timedelta_to_timestamp(timedelta(seconds=current_length))} to {convert_timedelta_to_timestamp(timedelta(seconds=chunk_end))}.",
+                    f"Transcribing audio segment \033[93m{convert_timedelta_to_timestamp(timedelta(seconds=current_length))} \033[94mto \033[93m{convert_timedelta_to_timestamp(timedelta(seconds=chunk_end))}.",
                     isTranscribing=True,
                     isSending=True,
                 )
@@ -1161,7 +1161,7 @@ class GeminiSRTTranslator:
                         current_length,
                         audio_length,
                         prefix="Transcribing:",
-                        suffix=f"{self.model_name}",
+                        suffix=f"\033[31m{self.model_name}",
                         isSending=True,
                         isTranscribing=True,
                     )
@@ -1180,12 +1180,12 @@ class GeminiSRTTranslator:
                 audio_length,
                 audio_length,
                 prefix="Transcribing:",
-                suffix=f"{self.model_name}",
+                suffix=f"\033[31m{self.model_name}",
                 isTranscribing=True,
             )
             with open(self.output_file, "w", encoding="utf-8") as f:
                 f.write(transcribed_subtitle)
-            success_with_progress(f"Transcription saved to {self.output_file}", isTranscribing=True)
+            success_with_progress(f"\n\033[96mTranscription saved to\033[92m {self.output_file}", isTranscribing=True)
             if self.progress_log:
                 save_logs_to_file(self.log_file_path)
             if extracted and self.audio_file and os.path.exists(self.audio_file):
