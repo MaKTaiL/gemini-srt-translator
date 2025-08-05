@@ -1252,6 +1252,9 @@ class GeminiSRTTranslator:
 
                             transcription_json = json_repair.loads(response_text)
 
+                            if not transcription_json:
+                                raise ValueError("API returned an empty transcript. Retrying segment.")
+
                             for i in range(len(transcription_json)):
                                 start_ts = _normalize_timestamp(transcription_json[i]["time_start"])
                                 end_ts = _normalize_timestamp(transcription_json[i]["time_end"])
