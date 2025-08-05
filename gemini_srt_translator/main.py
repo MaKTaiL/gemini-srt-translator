@@ -261,7 +261,7 @@ class GeminiSRTTranslator:
                         if self.use_colors:
                             info(f"Resuming from line \033[31m{saved_line}")
                         else:
-                            info(f"Resuming from line {saved_line}")
+                            info(f"Resuming from line \033[31m{saved_line}")
                         self.start_line = saved_line
                     else:
                         info("Starting from the beginning")
@@ -326,7 +326,7 @@ class GeminiSRTTranslator:
 
                 if should_resume:
                     info(
-                        f"Resuming transcription from {convert_timedelta_to_timestamp(timedelta(seconds=int(saved_time)))}"
+                        f"Resuming transcription from \033[33m{convert_timedelta_to_timestamp(timedelta(seconds=int(saved_time)))}\n"
                     )
                     try:
                         with open(self.output_file, "r", encoding="utf-8") as f_in:
@@ -459,7 +459,7 @@ class GeminiSRTTranslator:
                         f"Translated file \033[90m{self.output_file}\033[94m already exists. Loading existing translation...\n"
                     )
                 else:
-                    info(f"Translated file {self.output_file} already exists. Loading existing translation...\n")
+                    info(f"Translated file \033[90m{self.output_file}\033[94m already exists. Loading existing translation...\n")
                 if self.start_line == None:
                     while True:
                         try:
@@ -513,7 +513,7 @@ class GeminiSRTTranslator:
                     if self.use_colors:
                         info("\033[33mPro model and free user quota detected, using secondary API key if needed.\n")
                     else:
-                        info("Pro model and free user quota detected, using secondary API key if needed.\n")
+                        info("\033[33mPro model and free user quota detected, using secondary API key if needed.\n")
 
             i = self.start_line - 1
             total = len(original_subtitle)
@@ -580,7 +580,7 @@ class GeminiSRTTranslator:
             if self.use_colors:
                 progress_bar(i, total, prefix="Translating:", suffix=f"\033[31m{self.model_name}", isSending=True)
             else:
-                progress_bar(i, total, prefix="Translating:", suffix=f"{self.model_name}", isSending=True)
+                progress_bar(i, total, prefix="Translating:", suffix=f"\033[31m{self.model_name}", isSending=True)
 
             if self.gemini_api_key2:
                 if self.use_colors:
@@ -1088,14 +1088,24 @@ class GeminiSRTTranslator:
 
         current_length, transcribed_subtitle_objects = self._check_saved_transcribe_progress()
 
+        # MODIFICARE: Definim o variabilă pentru suprapunere, în secunde. 15 secunde este o valoare sigură.
+        overlap_seconds = 15
+        
+        # MODIFICARE: Variabilă pentru a stoca timpul de final al ultimei subtitrări valide.
+        # Dacă reluăm, o inițializăm cu timpul de final al ultimei subtitrări salvate.
+        last_subtitle_end_time = transcribed_subtitle_objects[-1].end if transcribed_subtitle_objects else timedelta(seconds=0)
+        
         last_saved_time = current_length
 
         def handle_interrupt(signal_received, frame):
+            # MODIFICARE: Salvăm progresul pe baza timpului de final al ultimei subtitrări, nu a segmentului,
+            # pentru o reluare mult mai precisă.
+            final_save_time = last_subtitle_end_time.total_seconds()
             warning_with_progress(
                 f"Transcription interrupted. Saving partial results and progress...",
                 isTranscribing=True,
             )
-            self._save_transcribe_progress(last_saved_time)
+            self._save_transcribe_progress(final_save_time)
             if transcribed_subtitle_objects:
                 transcribed_subtitle = srt.compose(transcribed_subtitle_objects)
                 with open(self.output_file, "w", encoding="utf-8") as f:
@@ -1116,13 +1126,34 @@ class GeminiSRTTranslator:
 
             self._save_transcribe_progress(current_length)
 
-            while current_length < int(audio_length):
-                chunk_end = min(current_length + self.audio_chunk_size, int(audio_length))
-                audio_chunk = audio_file[current_length * 1000 : chunk_end * 1000].export(format="mp3").read()
+            # MODIFICARE: Folosim processed_seconds pentru a urmări limita superioară a audio-ului procesat.
+            processed_seconds = current_length
+
+            while processed_seconds < int(audio_length):
+                # MODIFICARE: Calculăm dinamic începutul și sfârșitul segmentului pentru a include suprapunerea.
+                chunk_start = max(0, processed_seconds - overlap_seconds)
+                chunk_end = min(processed_seconds + self.audio_chunk_size, int(audio_length))
+
+                # MODIFICARE: Caz special pentru ultimul segment, pentru a ne asigura că procesăm totul până la final.
+                if chunk_end >= int(audio_length):
+                    chunk_start = max(0, int(audio_length) - self.audio_chunk_size - overlap_seconds)
+                    chunk_end = int(audio_length) # Asigură că se termină exact la sfârșit
+
+                # Dacă din cauza reluării, chunk_start este mai mic decât progresul real, îl ajustăm.
+                if chunk_start < last_subtitle_end_time.total_seconds() - overlap_seconds:
+                     chunk_start = int(last_subtitle_end_time.total_seconds()) - overlap_seconds
+
+                # Dacă am procesat deja totul, ieșim din buclă.
+                if chunk_start >= chunk_end:
+                    break
+
+                audio_chunk = audio_file[chunk_start * 1000 : chunk_end * 1000].export(format="mp3").read()
                 audio_part = types.Part.from_bytes(data=audio_chunk, mime_type="audio/mp3")
                 current_message = types.Content(role="user", parts=[audio_part])
+                
+                # MODIFICARE: Afișăm progresul real bazat pe ultima subtitrare adăugată.
                 progress_bar(
-                    current_length,
+                    int(last_subtitle_end_time.total_seconds()),
                     audio_length,
                     prefix="Transcribing:",
                     suffix=f"\033[31m{self.model_name}" if self.use_colors else f"{self.model_name}",
@@ -1131,13 +1162,13 @@ class GeminiSRTTranslator:
                 )
                 if self.use_colors:
                     info_with_progress(
-                        f"Transcribing audio segment \033[93m{convert_timedelta_to_timestamp(timedelta(seconds=current_length))} \033[94mto \033[93m{convert_timedelta_to_timestamp(timedelta(seconds=chunk_end))}.",
+                        f"Transcribing audio segment \033[93m{convert_timedelta_to_timestamp(timedelta(seconds=chunk_start))} \033[94mto \033[93m{convert_timedelta_to_timestamp(timedelta(seconds=chunk_end))}.",
                         isTranscribing=True,
                         isSending=True,
                     )
                 else:
                     info_with_progress(
-                        f"Transcribing audio segment {convert_timedelta_to_timestamp(timedelta(seconds=current_length))} to {convert_timedelta_to_timestamp(timedelta(seconds=chunk_end))}.",
+                        f"Transcribing audio segment {convert_timedelta_to_timestamp(timedelta(seconds=chunk_start))} to {convert_timedelta_to_timestamp(timedelta(seconds=chunk_end))}.",
                         isTranscribing=True,
                         isSending=True,
                     )
@@ -1242,32 +1273,43 @@ class GeminiSRTTranslator:
                                                         ts_for_anim = _normalize_timestamp(
                                                             transcription_json[-2]["time_end"]
                                                         )
-                                                        processed_seconds = convert_timestamp_to_timedelta(
+                                                        processed_seconds_anim = convert_timestamp_to_timedelta(
                                                             ts_for_anim
                                                         ).total_seconds()
-                                                        update_loading_animation(processed_seconds, isTranscribing=True)
+                                                        update_loading_animation(processed_seconds_anim, isTranscribing=True)
 
                             if blocked:
                                 raise Exception("Content blocked by the API.")
 
                             transcription_json = json_repair.loads(response_text)
-
-                            if not transcription_json:
+                            
+                            if not transcription_json and chunk_end < int(audio_length):
                                 raise ValueError("API returned an empty transcript. Retrying segment.")
 
+                            # MODIFICARE: Iterăm prin subtitrările primite și le filtrăm pe cele suprapuse.
                             for i in range(len(transcription_json)):
                                 start_ts = _normalize_timestamp(transcription_json[i]["time_start"])
                                 end_ts = _normalize_timestamp(transcription_json[i]["time_end"])
-                                subtitle_kwargs = {
-                                    "index": str(index),
-                                    "content": transcription_json[i]["text"],
-                                    "start": convert_timestamp_to_timedelta(start_ts, offset=current_length),
-                                    "end": convert_timestamp_to_timedelta(end_ts, offset=current_length),
-                                }
-                                if self._dominant_strong_direction(subtitle_kwargs["content"]) == "rtl":
-                                    subtitle_kwargs["content"] = f"\u202b{subtitle_kwargs['content']}\u202c"
-                                transcribed_subtitle_objects.append(Subtitle(**subtitle_kwargs))
-                                index += 1
+                                
+                                # MODIFICARE: Offset-ul este acum `chunk_start`, nu `current_length`.
+                                new_subtitle_start = convert_timestamp_to_timedelta(start_ts, offset=chunk_start)
+                                new_subtitle_end = convert_timestamp_to_timedelta(end_ts, offset=chunk_start)
+
+                                # MODIFICARE: Adăugăm subtitrarea doar dacă începe DUPĂ ce s-a terminat ultima subtitrare validă.
+                                if new_subtitle_start > last_subtitle_end_time:
+                                    subtitle_kwargs = {
+                                        "index": str(index),
+                                        "content": transcription_json[i]["text"],
+                                        "start": new_subtitle_start,
+                                        "end": new_subtitle_end,
+                                    }
+                                    if self._dominant_strong_direction(subtitle_kwargs["content"]) == "rtl":
+                                        subtitle_kwargs["content"] = f"\u202b{subtitle_kwargs['content']}\u202c"
+                                    
+                                    transcribed_subtitle_objects.append(Subtitle(**subtitle_kwargs))
+                                    # Actualizăm timpul de final cu noua subtitrare adăugată.
+                                    last_subtitle_end_time = new_subtitle_end 
+                                    index += 1
 
                             done = True
 
@@ -1315,9 +1357,12 @@ class GeminiSRTTranslator:
 
                 server_error_retries = 0
 
-                current_length = chunk_end
-                last_saved_time = current_length
-                self._save_transcribe_progress(current_length)
+                # MODIFICARE: Actualizăm progresul pe baza sfârșitului segmentului procesat, nu a ultimei subtitrări.
+                processed_seconds = chunk_end
+                
+                # MODIFICARE: Salvăm progresul real bazat pe ultima subtitrare validă, pentru reluare corectă.
+                last_saved_time = last_subtitle_end_time.total_seconds()
+                self._save_transcribe_progress(last_saved_time)
                 self.batch_number += 1
                 if self.progress_log:
                     save_logs_to_file(self.log_file_path)
