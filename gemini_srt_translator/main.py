@@ -84,7 +84,7 @@ class GeminiSRTTranslator:
         start_line: int = None,
         description: str = None,
         model_name: str = "gemini-2.5-flash",
-        batch_size: int = 300,
+        batch_size: int = 500,
         streaming: bool = True,
         thinking: bool = True,
         thinking_budget: int = None,
@@ -176,21 +176,34 @@ class GeminiSRTTranslator:
             self.thinking_level = None
             if "pro" in self.model_name:
                 if self.thinking == False:
-                    warning("You cannot disable thinking for Gemini 2.5 Pro. Setting thinking budget to 128.", ignore_quiet=True)
+                    warning_with_progress(
+                        "You cannot disable thinking for Gemini 2.5 Pro. Setting thinking budget to 128.",
+                        ignore_quiet=True,
+                    )
                     self.thinking_budget = 128
                 if self.thinking_budget is not None and self.thinking_budget < 128:
-                    warning(
+                    warning_with_progress(
                         "Gemini 2.5 Pro requires a minimum thinking budget of 128. Setting to 128.",
                         ignore_quiet=True,
                     )
                     self.thinking_budget = 128
         elif "3" in self.model_name:
             self.thinking_budget = None
-            if "pro" in self.model_name and self.thinking_level is not None and ("medium" in self.thinking_level or "minimal" in self.thinking_level):
-                warning("You cannot set thinking level to medium or minimal for Gemini 3.0 Pro. Setting thinking level to low.", ignore_quiet=True)
+            if (
+                "pro" in self.model_name
+                and self.thinking_level is not None
+                and ("medium" in self.thinking_level or "minimal" in self.thinking_level)
+            ):
+                warning_with_progress(
+                    "You cannot set thinking level to medium or minimal for Gemini 3.0 Pro. Setting thinking level to low.",
+                    ignore_quiet=True,
+                )
                 self.thinking_level = "low"
             if self.thinking == False:
-                warning("You cannot disable thinking for Gemini 3.0 models. Setting thinking level to lowest possible.", ignore_quiet=True)
+                warning_with_progress(
+                    "You cannot disable thinking for Gemini 3.0 models. Setting thinking level to lowest possible.",
+                    ignore_quiet=True,
+                )
                 if "pro" in self.model_name:
                     self.thinking_level = "low"
                 else:
@@ -230,26 +243,39 @@ class GeminiSRTTranslator:
             self.thinking_level = None
             if "pro" in self.model_name:
                 if self.thinking == False:
-                    warning("You cannot disable thinking for Gemini 2.5 Pro. Setting thinking budget to 128.", ignore_quiet=True)
+                    warning_with_progress(
+                        "You cannot disable thinking for Gemini 2.5 Pro. Setting thinking budget to 128.",
+                        ignore_quiet=True,
+                    )
                     self.thinking_budget = 128
                 if self.thinking_budget is not None and self.thinking_budget < 128:
-                    warning(
+                    warning_with_progress(
                         "Gemini 2.5 Pro requires a minimum thinking budget of 128. Setting to 128.",
                         ignore_quiet=True,
                     )
                     self.thinking_budget = 128
         elif "3" in self.model_name:
             self.thinking_budget = None
-            if "pro" in self.model_name and self.thinking_level is not None and ("medium" in self.thinking_level or "minimal" in self.thinking_level):
-                warning("You cannot set thinking level to medium or minimal for Gemini 3.0 Pro. Setting thinking level to low.", ignore_quiet=True)
+            if (
+                "pro" in self.model_name
+                and self.thinking_level is not None
+                and ("medium" in self.thinking_level or "minimal" in self.thinking_level)
+            ):
+                warning_with_progress(
+                    "You cannot set thinking level to medium or minimal for Gemini 3.0 Pro. Setting thinking level to low.",
+                    ignore_quiet=True,
+                )
                 self.thinking_level = "low"
             if self.thinking == False:
-                warning("You cannot disable thinking for Gemini 3.0 models. Setting thinking level to lowest possible.", ignore_quiet=True)
+                warning_with_progress(
+                    "You cannot disable thinking for Gemini 3.0 models. Setting thinking level to lowest possible.",
+                    ignore_quiet=True,
+                )
                 if "pro" in self.model_name:
                     self.thinking_level = "low"
                 else:
                     self.thinking_level = "minimal"
-                    
+
         return types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=get_transcribe_response_schema(),
@@ -474,7 +500,12 @@ class GeminiSRTTranslator:
                     exit(1)
 
         if self.thinking_level is not None and "gemini-3" in self.model_name:
-            if self.thinking_level != "minimal" and self.thinking_level != "low" and self.thinking_level != "medium" and self.thinking_level != "high":
+            if (
+                self.thinking_level != "minimal"
+                and self.thinking_level != "low"
+                and self.thinking_level != "medium"
+                and self.thinking_level != "high"
+            ):
                 error("Thinking level must be 'minimal', 'low', 'medium', or 'high'.", ignore_quiet=True)
                 exit(1)
 
@@ -885,7 +916,7 @@ class GeminiSRTTranslator:
             bool: True if token size is valid, False otherwise
         """
         client = self._get_client()
-        token_count = client.models.count_tokens(model="gemini-2.0-flash", contents=contents)
+        token_count = client.models.count_tokens(model="gemini-2.5-flash-lite", contents=contents)
         self.token_count = token_count.total_tokens
         if token_count.total_tokens > self.token_limit * 0.9:
             return False
@@ -1020,7 +1051,11 @@ class GeminiSRTTranslator:
             )
             signal.raise_signal(signal.SIGINT)
         parts = []
-        parts.append(types.Part(thought_signature=self.thought_signature)) if self.thought_signature else parts.append(types.Part(thought=True, text=thoughts_text)) if thoughts_text else None
+        (
+            parts.append(types.Part(thought_signature=self.thought_signature))
+            if self.thought_signature
+            else parts.append(types.Part(thought=True, text=thoughts_text)) if thoughts_text else None
+        )
         parts.append(types.Part(text=response_text))
         previous_content = [
             types.Content(role="user", parts=[types.Part(text=json.dumps(batch, ensure_ascii=False))]),
@@ -1141,7 +1176,7 @@ class GeminiSRTTranslator:
                 ignore_quiet=True,
             )
             exit(1)
-        
+
         if self.thinking_budget is not None:
             if "gemini" in self.model_name:
                 if "3" in self.model_name or "2.0" in self.model_name:
@@ -1152,9 +1187,14 @@ class GeminiSRTTranslator:
                 elif "pro" in self.model_name and (self.thinking_budget < 128 or self.thinking_budget > 32768):
                     error("Thinking budget must be between 128 and 32768.", ignore_quiet=True)
                     exit(1)
-        
+
         if self.thinking_level is not None and "gemini-3" in self.model_name:
-            if self.thinking_level != "minimal" and self.thinking_level != "low" and self.thinking_level != "medium" and self.thinking_level != "high":
+            if (
+                self.thinking_level != "minimal"
+                and self.thinking_level != "low"
+                and self.thinking_level != "medium"
+                and self.thinking_level != "high"
+            ):
                 error("Thinking level must be 'minimal', 'low', 'medium', or 'high'.", ignore_quiet=True)
                 exit(1)
 
