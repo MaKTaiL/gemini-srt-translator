@@ -132,6 +132,8 @@ def cmd_translate(args) -> None:
         gst.quiet = args.quiet
     if args.resume:
         gst.resume = args.resume
+    if args.include_timestamps:
+        gst.include_timestamps = args.include_timestamps
 
     # Execute translation
     try:
@@ -314,6 +316,10 @@ Examples:
     )
     translate_parser.add_argument(
         "--extract-audio", action="store_true", default=None, help="Extract audio from video for context"
+    )
+    translate_parser.add_argument(
+        "--include-timestamps", action="store_true", default=None,
+        help="Include timestamps in translation for context matching with description"
     )
 
     # Extract audio command

@@ -26,6 +26,7 @@
 - 🎞️ **SRT Extraction**: Extract and translate SRT subtitles from video files automatically (requires [FFmpeg](https://ffmpeg.org/)).
 - 🎵 **Audio Context**: Extract audio from a video file or provide your own to improve translation accuracy (requires [FFmpeg](https://ffmpeg.org/)).
 - 📜 **Description Support**: Add a description to your translation job to guide the AI in using specific terminology or context.
+- ⏱️ **Timestamp Context**: Include subtitle timestamps to help AI match context from description for better speaker identification and grammatical gender accuracy.
 - 📋 **List Models**: Easily list all currently available Gemini models to choose the best fit for your needs.
 - 🔄 **Auto-Update**: Keep the tool updated with automatic version checking and update prompts.
 - 📝 **Logging**: Optional saving of progress and 'thinking' process logs for review.
@@ -160,6 +161,7 @@ gst translate \
   -o output_french.srt \
   --model gemini-2.5-flash \
   --batch-size 150 \
+  --include-timestamps \
   --temperature 0.7 \
   --description "Medical TV series, use medical terminology" \
   --progress-log \
@@ -287,6 +289,7 @@ gst.extract("audio")
 - `output_file`: Name of the translated file.
 - `start_line`: Starting line for translation.
 - `description`: Description of the translation job.
+- `include_timestamps`: Include subtitle timestamps in translation requests to match context from description. Useful for identifying speakers and applying correct grammatical gender. **Note: Uses more tokens.** Requires `gemini-2.5-flash` or newer (default: False).
 - `batch_size`: Batch size (default: 300).
 - `free_quota`: Signal GST that you are using a free quota (default: True).
 - `skip_upgrade`: Skip version upgrade check (default: False).
@@ -326,6 +329,7 @@ gst.audio_file = "audio.mp3"
 gst.extract_audio = False
 gst.start_line = 20
 gst.description = "Medical TV series, use medical terms"
+gst.include_timestamps = True
 gst.model_name = "gemini-2.5-pro-preview-03-25"
 gst.batch_size = 150
 gst.streaming = True

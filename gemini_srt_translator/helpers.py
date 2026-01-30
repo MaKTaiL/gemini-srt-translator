@@ -13,6 +13,7 @@ def get_translate_instruction(
     thinking_compatible: bool,
     audio_file: Optional[str] = None,
     description: Optional[str] = None,
+    include_timestamps: bool = False,
 ) -> str:
     """
     Generates a structured instruction prompt for a subtitle translation task.
@@ -46,7 +47,7 @@ def get_translate_instruction(
   {{
     "index": "1",
     "text": "This is the first subtitle line.\\nThis is the second line.",
-{'    ' + audio_structure if audio_file else '...'}
+{'    ' + audio_structure if audio_file or include_timestamps else '...'}
   }}
 ]
 ```"""
@@ -108,6 +109,18 @@ Use this context to improve translation accuracy. These notes do not override co
 ## {section_number}. Reasoning Protocol
 {reasoning_instruction}"""
         prompt_parts.append(reasoning_protocol_section)
+
+    # --- Section 6: include timestamps ---
+    if include_timestamps and description and not audio_file:
+        section_number += 1
+        timestamp_context_section = f"""
+        ## {section_number}. Using Timestamps for Context Matching
+        Each subtitle includes `time_start` and `time_end` fields (in `MM:SS` format). Use these timestamps to match each subtitle with the transcription/context provided below.
+        - **Identify speakers**: Determine WHO is speaking and TO WHOM based on the context at that timestamp.
+        - **Apply correct gender**: Use appropriate grammatical gender for verbs and adjectives based on the speaker's gender (e.g., Polish: "zrobiłem" for male vs "zrobiłam" for female).
+        - **Scene context**: Understand the situation, location, and emotional tone of the scene to choose appropriate vocabulary and register.
+        """
+        prompt_parts.append(timestamp_context_section)
 
     return "\n---\n".join(prompt_parts).strip()
 

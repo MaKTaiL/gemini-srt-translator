@@ -48,6 +48,7 @@ extract_audio: bool = None
 isolate_voice: bool = None
 start_line: int = None
 description: str = None
+include_timestamps: bool = False
 model_name: str = None
 batch_size: int = None
 streaming: bool = None
@@ -238,6 +239,7 @@ def translate():
         "isolate_voice": isolate_voice,
         "start_line": start_line,
         "description": description,
+        "include_timestamps": include_timestamps,
         "model_name": model_name,
         "batch_size": batch_size,
         "streaming": streaming,

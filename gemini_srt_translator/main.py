@@ -83,6 +83,7 @@ class GeminiSRTTranslator:
         isolate_voice: bool = True,
         start_line: int = None,
         description: str = None,
+        include_timestamps: bool = False,
         model_name: str = "gemini-2.5-flash",
         batch_size: int = 500,
         streaming: bool = True,
@@ -135,6 +136,7 @@ class GeminiSRTTranslator:
         self.isolate_voice = isolate_voice
         self.start_line = start_line
         self.description = description
+        self.include_timestamps = include_timestamps
         self.model_name = model_name
         self.batch_size = batch_size
         self.streaming = streaming
@@ -222,6 +224,7 @@ class GeminiSRTTranslator:
                 thinking_compatible=thinking_compatible,
                 audio_file=self.audio_file,
                 description=self.description,
+                include_timestamps=self.include_timestamps,
             ),
             thinking_config=(
                 types.ThinkingConfig(
@@ -614,7 +617,7 @@ class GeminiSRTTranslator:
                         "index": str(j),
                         "text": original_subtitle[j].content,
                     }
-                    if self.audio_file:
+                    if self.audio_file or self.include_timestamps:
                         subtitle_kwargs["time_start"] = convert_timedelta_to_timestamp(
                             original_subtitle[j].start, offset=offset
                         )
@@ -703,16 +706,25 @@ class GeminiSRTTranslator:
                             "index": str(i),
                             "text": original_subtitle[i].content,
                         }
-                        if self.audio_file:
-                            if len(batch) == 0:
-                                offset = original_subtitle[i].start.seconds
-                            subtitle_kwargs["time_start"] = convert_timedelta_to_timestamp(
-                                original_subtitle[i].start, offset=offset
-                            )
-                            subtitle_kwargs["time_end"] = convert_timedelta_to_timestamp(
-                                original_subtitle[i].end, offset=offset
-                            )
-                            offset_end = original_subtitle[i].end.seconds
+                        if self.audio_file or self.include_timestamps:
+                            if self.audio_file:
+                                if len(batch) == 0:
+                                    offset = original_subtitle[i].start.seconds
+                                subtitle_kwargs["time_start"] = convert_timedelta_to_timestamp(
+                                    original_subtitle[i].start, offset=offset
+                                )
+                                subtitle_kwargs["time_end"] = convert_timedelta_to_timestamp(
+                                    original_subtitle[i].end, offset=offset
+                                )
+                                offset_end = original_subtitle[i].end.seconds
+                            else:
+                                # original times
+                                subtitle_kwargs["time_start"] = convert_timedelta_to_timestamp(
+                                    original_subtitle[i].start
+                                )
+                                subtitle_kwargs["time_end"] = convert_timedelta_to_timestamp(
+                                    original_subtitle[i].end
+                                )
                         batch.append(SubtitleObject(**subtitle_kwargs))
                         i += 1
                         continue
