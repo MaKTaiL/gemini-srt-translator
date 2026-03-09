@@ -165,7 +165,35 @@ class GeminiSRTTranslator:
         self.max_consecutive_errors = 5
         self.thought_signature = None
 
+        self.total_prompt_tokens = 0
+        self.total_candidates_tokens = 0
+        self.total_thoughts_tokens = 0
+        self.total_tokens = 0
+
         set_color_mode(use_colors)
+
+    def _accumulate_usage(self, usage_metadata):
+        """Accumulate token usage from a response's usage_metadata."""
+        if usage_metadata:
+            self.total_prompt_tokens += usage_metadata.prompt_token_count or 0
+            self.total_candidates_tokens += usage_metadata.candidates_token_count or 0
+            self.total_thoughts_tokens += getattr(usage_metadata, "thoughts_token_count", 0) or 0
+            self.total_tokens += usage_metadata.total_token_count or 0
+
+    def _log_token_usage(self, is_transcribing=False):
+        """Log accumulated token usage summary."""
+        if self.total_tokens > 0:
+            msg = f"Tokens used — prompt: {self.total_prompt_tokens:,}, completion: {self.total_candidates_tokens:,}, total: {self.total_tokens:,}"
+            if self.total_thoughts_tokens > 0:
+                msg += f" (thinking: {self.total_thoughts_tokens:,})"
+            info_with_progress(msg, isTranscribing=is_transcribing)
+
+    def _reset_token_usage(self):
+        """Reset token usage counters."""
+        self.total_prompt_tokens = 0
+        self.total_candidates_tokens = 0
+        self.total_thoughts_tokens = 0
+        self.total_tokens = 0
 
     def _get_translate_config(self):
         """Get the configuration for the translation model."""
@@ -442,6 +470,7 @@ class GeminiSRTTranslator:
         Main translation method. Reads the input subtitle file, translates it in batches,
         and writes the translated subtitles to the output file.
         """
+        self._reset_token_usage()
 
         if not self.ffmpeg_installed and self.video_file:
             error("FFmpeg is not installed. Please install FFmpeg to use video features.", ignore_quiet=True)
@@ -851,6 +880,7 @@ class GeminiSRTTranslator:
                 success_with_progress("\n\033[96m✅ \033[96mTranslation completed successfully!")
             else:
                 success_with_progress("\n✅ Translation completed successfully!")
+            self._log_token_usage()
             if self.progress_log:
                 save_logs_to_file(self.log_file_path)
             translated_file.write(srt.compose(translated_subtitle, reindex=False, strict=False))
@@ -988,6 +1018,7 @@ class GeminiSRTTranslator:
                     else:
                         info_with_progress(f"Batch {self.batch_number}.{retry} thinking process saved to file.")
                     save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
+                self._accumulate_usage(response.usage_metadata)
                 self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text)
                 if not isinstance(self.translated_batch, list) or not all(
                     isinstance(item, dict) for item in self.translated_batch
@@ -1039,6 +1070,8 @@ class GeminiSRTTranslator:
                         finished=False,
                     )
                     update_loading_animation(chunk_size=chunk_size)
+                if not blocked:
+                    self._accumulate_usage(chunk.usage_metadata)
 
             if len(self.translated_batch) == len(batch):
                 self._process_translated_lines(
@@ -1180,6 +1213,7 @@ class GeminiSRTTranslator:
         """
         Transcribe audio file into subtitles.
         """
+        self._reset_token_usage()
         extracted = False
         if self.video_file and not self.audio_file:
             self.audio_file = extract_audio_from_video(self.video_file, isolate_voice=self.isolate_voice)
@@ -1354,6 +1388,7 @@ class GeminiSRTTranslator:
                                             isTranscribing=True,
                                         )
                                     save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
+                                self._accumulate_usage(response.usage_metadata)
                             else:
                                 if blocked:
                                     break
@@ -1400,6 +1435,8 @@ class GeminiSRTTranslator:
                                                             ts_for_anim
                                                         ).total_seconds()
                                                         update_loading_animation(processed_seconds, isTranscribing=True)
+                                if not blocked:
+                                    self._accumulate_usage(chunk.usage_metadata)
 
                             if blocked:
                                 raise Exception("Content blocked by the API.")
@@ -1490,6 +1527,7 @@ class GeminiSRTTranslator:
                 )
             else:
                 success_with_progress(f"\nTranscription saved to {self.output_file}", isTranscribing=True)
+            self._log_token_usage(is_transcribing=True)
 
             if os.path.exists(self.progress_file):
                 os.remove(self.progress_file)
