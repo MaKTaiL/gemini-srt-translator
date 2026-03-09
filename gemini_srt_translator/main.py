@@ -989,6 +989,10 @@ class GeminiSRTTranslator:
                         info_with_progress(f"Batch {self.batch_number}.{retry} thinking process saved to file.")
                     save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
                 self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text)
+                if not isinstance(self.translated_batch, list) or not all(
+                    isinstance(item, dict) for item in self.translated_batch
+                ):
+                    self.translated_batch = self._flatten_repaired_json(self.translated_batch)
             else:
                 if blocked:
                     break
@@ -1021,6 +1025,10 @@ class GeminiSRTTranslator:
                                     done_thinking = True
                                 response_text += part.text
                                 self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text)
+                    if not isinstance(self.translated_batch, list) or not all(
+                        isinstance(item, dict) for item in self.translated_batch
+                    ):
+                        self.translated_batch = self._flatten_repaired_json(self.translated_batch)
                     chunk_size = len(self.translated_batch)
                     if chunk_size == 0:
                         continue
@@ -1063,6 +1071,28 @@ class GeminiSRTTranslator:
         ]
         batch.clear()
         return previous_content
+
+    @staticmethod
+    def _flatten_repaired_json(data) -> list:
+        """
+        Flatten nested structures produced by json_repair when partial JSON
+        contains \\n-[ patterns (newline + bracket in subtitle text).
+
+        json_repair can misinterpret these as array boundaries, producing
+        nested lists like [[{...}, {...}], ["text"]] instead of [{...}, {...}].
+        This extracts all valid dict items from the nested structure.
+        """
+        result = []
+        if not isinstance(data, list):
+            return result
+        for item in data:
+            if isinstance(item, dict):
+                result.append(item)
+            elif isinstance(item, list):
+                for sub in item:
+                    if isinstance(sub, dict):
+                        result.append(sub)
+        return result
 
     def _process_translated_lines(
         self,
