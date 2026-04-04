@@ -64,6 +64,11 @@ progress_log: bool = None
 thoughts_log: bool = None
 quiet: bool = None
 resume: bool = None
+use_webapi: bool = False
+secure_1psid: str = None
+secure_1psidts: str = None
+proxy: str = None
+browser: bool = False
 
 if not skip_upgrade:
     try:
@@ -252,6 +257,11 @@ def translate():
         "progress_log": progress_log,
         "thoughts_log": thoughts_log,
         "resume": resume,
+        "use_webapi": use_webapi,
+        "secure_1psid": secure_1psid,
+        "secure_1psidts": secure_1psidts,
+        "proxy": proxy,
+        "browser": browser,
     }
 
     if quiet:
@@ -362,6 +372,11 @@ def transcribe():
         "use_colors": use_colors,
         "thoughts_log": thoughts_log,
         "resume": resume,
+        "use_webapi": use_webapi,
+        "secure_1psid": secure_1psid,
+        "secure_1psidts": secure_1psidts,
+        "proxy": proxy,
+        "browser": browser,
     }
 
     if params["isolate_voice"] is None:

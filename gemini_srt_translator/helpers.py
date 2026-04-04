@@ -289,6 +289,53 @@ def get_transcribe_response_schema() -> types.Schema:
 
 
 # ==============================================================================
+# WEB API PROMPT BUILDERS
+# ==============================================================================
+
+def build_webapi_translate_prompt(
+    language: str,
+    thinking: bool,
+    thinking_compatible: bool,
+    current_batch: str,
+    previous_context: Optional[str] = None,
+    audio_file: Optional[str] = None,
+    description: Optional[str] = None,
+) -> str:
+    """
+    Builds a single prompt string for the Gemini Web API combining instructions,
+    context, and the actual batch data.
+    """
+    instruction = get_translate_instruction(
+        language, thinking, thinking_compatible, audio_file, description
+    )
+    
+    prompt = f"{instruction}\n\n"
+    prompt += "CRITICAL: You MUST respond with ONLY a valid JSON array, strictly adhering to the requested schema. Do NOT wrap the JSON in Markdown formatting (```json ... ```) or provide any other conversational text.\n\n"
+    
+    if previous_context:
+        prompt += f"--- PREVIOUS CONTEXT (For reference only, DO NOT translate these) ---\n{previous_context}\n\n"
+        
+    prompt += f"--- TRANSLATION TASK (Translate these items to {language}) ---\n{current_batch}"
+    return prompt
+
+
+def build_webapi_transcribe_prompt(
+    thinking: bool,
+    thinking_compatible: bool,
+    description: Optional[str] = None,
+) -> str:
+    """
+    Builds a single prompt string for the Gemini Web API for transcription.
+    """
+    instruction = get_transcribe_instruction(thinking, thinking_compatible, description)
+    
+    prompt = f"{instruction}\n\n"
+    prompt += "CRITICAL: You MUST respond with ONLY a valid JSON array, strictly adhering to the requested schema. Do NOT wrap the JSON in Markdown formatting (```json ... ```) or provide any other conversational text."
+    
+    return prompt
+
+
+# ==============================================================================
 # EXAMPLE USAGE
 # ==============================================================================
 

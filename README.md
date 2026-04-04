@@ -58,6 +58,14 @@ source venv/bin/activate
 pip install --upgrade gemini-srt-translator
 ```
 
+### Web API Backend (Optional)
+
+If you'd like to use the alternative Web API backend without an official SDK api key, install the optional extra:
+
+```sh
+pip install --upgrade "gemini-srt-translator[webapi]"
+```
+
 ---
 
 ## 🔑 How to Get Your API Key
@@ -112,6 +120,21 @@ You can provide your API key in several ways:
    gst.gemini_api_key = "your_api_key_here"
    ```
 
+### 🍪 Web API Cookies (Optional Backend)
+
+If you want to use the `--webapi` mode, you don't need a formal API key. Instead, you authenticate using your Gemini browser cookies (`__Secure-1PSID`).
+
+1. **Automatic (Recommended)**: Use the `--browser` flag, and the tool will automatically pull the cookies from your local Chrome/Edge/Firefox browser (Make sure you are logged into gemini.google.com).
+2. **Manual Environment Variable**: Set the `SECURE_1PSID` environment variable.
+   ```bash
+   export SECURE_1PSID="your_1psid_cookie_here"
+   export SECURE_1PSIDTS="your_1psidts_cookie_here" # Optional
+   ```
+3. **Command Line Argument**: Pass it manually using the flag
+   ```bash
+   gst translate -i subtitle.srt -l French --webapi --secure-1psid "your_cookie"
+   ```
+
 ---
 
 ## 🚀 Quick Start
@@ -145,6 +168,9 @@ gst translate -i subtitle.srt -l French --start-line 20
 
 # Suppress output
 gst translate -i subtitle.srt -l French --quiet
+
+# Use Web API backend with automatic browser cookie extraction
+gst translate -i subtitle.srt -l French --webapi --browser
 ```
 
 #### Advanced Options
@@ -254,6 +280,19 @@ gst.model_name = "gemini-2.5-flash"
 gst.transcribe()
 ```
 
+#### Transcribing Audio Using Web API
+
+```python
+import gemini_srt_translator as gst
+
+gst.use_webapi = True
+gst.browser = True # Automatically extracts credentials from your browser
+gst.audio_file = "audio.mp3"
+gst.output_file = "transcription.srt"
+
+gst.transcribe()
+```
+
 #### Extracting from Video
 
 ```python
@@ -279,6 +318,11 @@ gst.extract("audio")
 #### 🔧 GST Parameters
 
 - `gemini_api_key2`: Second key for more quota (useful for free Pro models).
+- `use_webapi`: Use the alternative Web API backend (default: False).
+- `browser`: Automatically extract authentication cookies from your local browser for Web API mode (default: False).
+- `secure_1psid`: The `__Secure-1PSID` cookie value for Web API.
+- `secure_1psidts`: The `__Secure-1PSIDTS` cookie value for Web API (optional).
+- `proxy`: Custom proxy address for the Web API (optional).
 - `video_file`: Path to a video file to extract subtitles and/or audio for context (requires [FFmpeg](https://ffmpeg.org/)).
 - `audio_file`: Path to an audio file to use as context for translation (requires [FFmpeg](https://ffmpeg.org/)).
 - `extract_audio`: Whether to extract and use audio context from the video file (default: False).
