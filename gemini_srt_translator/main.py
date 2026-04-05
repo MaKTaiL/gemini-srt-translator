@@ -1156,8 +1156,13 @@ class GeminiSRTTranslator:
         batch_str = json.dumps(batch, ensure_ascii=False)
         prompt = build_webapi_translate_prompt(
             language=self.target_language,
+            thinking=self.thinking,
+            thinking_compatible=True if self.thinking_level is not None else False,
             current_batch=batch_str,
             previous_context=previous_context_str,
+            audio_file=self.audio_file,
+            description=self.description,
+            is_continuation=self.batch_number > 1
         )
         
         files = []
@@ -1489,7 +1494,13 @@ class GeminiSRTTranslator:
                             retry += 1
                             if not self.streaming:
                                 if self.use_webapi:
-                                    prompt = build_webapi_transcribe_prompt(str(current_message) if isinstance(current_message, dict) else "Audio chunk")
+                                    prompt = build_webapi_transcribe_prompt(
+                                        self.thinking,
+                                        True if self.thinking_level is not None else False,
+                                        str(current_message) if isinstance(current_message, dict) else "Audio chunk",
+                                        description=self.description,
+                                        is_continuation=index > 1
+                                    )
                                     response = client.send_message(prompt, files=[current_message])
                                     if not response.text:
                                         raise ValueError("Gemini has returned an empty response.")
@@ -1532,7 +1543,13 @@ class GeminiSRTTranslator:
                                     break
                                 
                                 if self.use_webapi:
-                                    prompt = build_webapi_transcribe_prompt(str(current_message) if isinstance(current_message, dict) else "Audio chunk")
+                                    prompt = build_webapi_transcribe_prompt(
+                                        self.thinking,
+                                        True if self.thinking_level is not None else False,
+                                        str(current_message) if isinstance(current_message, dict) else "Audio chunk",
+                                        description=self.description,
+                                        is_continuation=index > 1
+                                    )
                                     response_stream = client.send_message_stream(prompt, files=[current_message])
                                     for chunk in response_stream:
                                         if chunk.thoughts_delta:

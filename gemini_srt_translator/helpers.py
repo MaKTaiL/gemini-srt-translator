@@ -315,17 +315,33 @@ def get_webapi_translate_system_prompt(
 
 def build_webapi_translate_prompt(
     language: str,
+    thinking: bool,
+    thinking_compatible: bool,
     current_batch: str,
     previous_context: Optional[str] = None,
+    audio_file: Optional[str] = None,
+    description: Optional[str] = None,
+    is_continuation: bool = True,
 ) -> str:
     """
-    Builds the iterative prompt string for the Gemini Web API (only batch data).
+    Builds the iterative prompt string for the Gemini Web API combining instructions,
+    context, and the actual batch data.
     """
-    prompt = ""
+    instruction = get_translate_instruction(
+        language, thinking, thinking_compatible, audio_file, description
+    )
+    
+    prompt = f"{instruction}\n\n"
+    if is_continuation:
+        prompt += "NOTE: I am continuing the translation of a large subtitle file. Below is the next batch of segments to translate. Please maintain consistency with previous segments.\n\n"
+        
+    prompt += "CRITICAL: You MUST respond with ONLY a valid JSON array, strictly adhering to the requested schema. Do NOT wrap the JSON in Markdown formatting (```json ... ```) or provide any other conversational text.\n"
+    prompt += "CRITICAL: DO NOT merge or drop any items! You must return the EXACT same number of items as provided in the input batch. Maintain all indexes.\n\n"
+    
     if previous_context:
         prompt += f"--- PREVIOUS CONTEXT (For reference only, DO NOT translate these) ---\n{previous_context}\n\n"
         
-    prompt += f"--- TRANSLATION TASK (Translate to {language}, remember to return ONLY a JSON array with exact count) ---\n{current_batch}"
+    prompt += f"--- TRANSLATION TASK (Translate to {language}) ---\n{current_batch}"
     return prompt
 
 
@@ -346,12 +362,23 @@ def get_webapi_transcribe_system_prompt(
     return prompt
 
 def build_webapi_transcribe_prompt(
+    thinking: bool,
+    thinking_compatible: bool,
     current_batch: str,
+    description: Optional[str] = None,
+    is_continuation: bool = True,
 ) -> str:
     """
     Builds the iterative prompt string for the Web API transcription.
     """
-    prompt = "--- TRANSCRIBE THIS AUDIO / TEXT BATCH ---\n"
+    instruction = get_transcribe_instruction(thinking, thinking_compatible, description)
+    
+    prompt = f"{instruction}\n\n"
+    if is_continuation:
+        prompt += "NOTE: I am continuing the transcription of a large audio file. Below is the next batch of audio/text to process. Please maintain consistency.\n\n"
+        
+    prompt += "CRITICAL: You MUST respond with ONLY a valid JSON array, strictly adhering to the requested schema. Do NOT wrap the JSON in Markdown formatting (```json ... ```) or provide any other conversational text.\n\n"
+    prompt += "--- TRANSCRIBE THIS AUDIO / TEXT BATCH ---\n"
     prompt += current_batch + "\n\n"
     prompt += "Remember: Return ONLY a valid JSON array adhering to the schema."
     return prompt
