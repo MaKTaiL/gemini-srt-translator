@@ -333,10 +333,13 @@ def build_webapi_translate_prompt(
     
     prompt = f"{instruction}\n\n"
     if is_continuation:
-        prompt += "NOTE: I am continuing the translation of a large subtitle file. Below is the next batch of segments to translate. Please maintain consistency with previous segments.\n\n"
+        prompt += "⚠️ CONTINUATION NOTICE: You are currently translating a very long subtitle file in parts. This is NOT the start of the file. Maintain terminology and tone consistency with previous sections. Do NOT skip any lines.\n\n"
         
-    prompt += "CRITICAL: You MUST respond with ONLY a valid JSON array, strictly adhering to the requested schema. Do NOT wrap the JSON in Markdown formatting (```json ... ```) or provide any other conversational text.\n"
-    prompt += "CRITICAL: DO NOT merge or drop any items! You must return the EXACT same number of items as provided in the input batch. Maintain all indexes.\n\n"
+    prompt += "🛑 CRITICAL RULES FOR WEB API:\n"
+    prompt += "1. You MUST respond with ONLY a valid JSON array. No markdown, no conversational filler.\n"
+    prompt += "2. You MUST return the EXACT same number of items as the input. (If I give you 50 items, you return 50 items).\n"
+    prompt += "3. DO NOT MERGE lines. Do NOT skip lines. Do NOT return an empty string for the 'text' field unless the input itself was empty.\n"
+    prompt += "4. Maintain all 'index' values exactly as they appear in the input.\n\n"
     
     if previous_context:
         prompt += f"--- PREVIOUS CONTEXT (For reference only, DO NOT translate these) ---\n{previous_context}\n\n"
@@ -375,12 +378,15 @@ def build_webapi_transcribe_prompt(
     
     prompt = f"{instruction}\n\n"
     if is_continuation:
-        prompt += "NOTE: I am continuing the transcription of a large audio file. Below is the next batch of audio/text to process. Please maintain consistency.\n\n"
+        prompt += "⚠️ CONTINUATION NOTICE: You are currently transcribing a long audio file in parts. This is NOT the start of the file. Maintain terminology and tone consistency with previous sections.\n\n"
         
-    prompt += "CRITICAL: You MUST respond with ONLY a valid JSON array, strictly adhering to the requested schema. Do NOT wrap the JSON in Markdown formatting (```json ... ```) or provide any other conversational text.\n\n"
+    prompt += "🛑 CRITICAL RULES FOR WEB API:\n"
+    prompt += "1. You MUST respond with ONLY a valid JSON array. No markdown, no conversational filler.\n"
+    prompt += "2. DO NOT MERGE segments. Do NOT return an empty string for the 'text' field unless the input was silent.\n"
+    prompt += "3. Response structure: [ { \"text\": \"...\", \"time_start\": \"...\", \"time_end\": \"...\" } ]\n\n"
+    
     prompt += "--- TRANSCRIBE THIS AUDIO / TEXT BATCH ---\n"
-    prompt += current_batch + "\n\n"
-    prompt += "Remember: Return ONLY a valid JSON array adhering to the schema."
+    prompt += current_batch + "\n"
     return prompt
 
 
