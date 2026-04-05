@@ -338,8 +338,9 @@ def build_webapi_translate_prompt(
     prompt += "🛑 CRITICAL RULES FOR WEB API:\n"
     prompt += "1. You MUST respond with ONLY a valid JSON array. No markdown, no conversational filler.\n"
     prompt += "2. You MUST return the EXACT same number of items as the input. (If I give you 50 items, you return 50 items).\n"
-    prompt += "3. DO NOT MERGE lines. Do NOT skip lines. Do NOT return an empty string for the 'text' field unless the input itself was empty.\n"
-    prompt += "4. Maintain all 'index' values exactly as they appear in the input.\n\n"
+    prompt += "3. DO NOT MERGE lines. Even if a sentence is split across two items (e.g., 'the' and 'end'), translate them separately in their respective items. NEVER leave an item empty by merging its content into another.\n"
+    prompt += "4. EVERY single JSON object in your array MUST have a non-empty 'text' field (unless the source was empty).\n"
+    prompt += "5. Maintain all 'index' values exactly as they appear in the input.\n\n"
     
     if previous_context:
         prompt += f"--- PREVIOUS CONTEXT (For reference only, DO NOT translate these) ---\n{previous_context}\n\n"
