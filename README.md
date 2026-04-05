@@ -438,5 +438,6 @@ Thank you to all who have contributed to this project:
 - [angelitto2005](https://github.com/angelitto2005)
 - [sjiampojamarn](https://github.com/sjiampojamarn)
 - [mkaflowski](https://github.com/mkaflowski)
+- [fr0stb1rd](https://github.com/fr0stb1rd)
 
 Special thanks to all users who have reported issues, suggested features, and helped improve the project.
