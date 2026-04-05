@@ -44,11 +44,15 @@ from .ffmpeg_utils import (
     get_audio_length,
 )
 from .helpers import (
+    build_webapi_translate_prompt,
+    build_webapi_transcribe_prompt,
     get_safety_settings,
     get_transcribe_instruction,
     get_transcribe_response_schema,
     get_translate_instruction,
     get_translate_response_schema,
+    get_webapi_translate_system_prompt,
+    get_webapi_transcribe_system_prompt,
 )
 from .utils import convert_timedelta_to_timestamp, convert_timestamp_to_timedelta
 
@@ -159,6 +163,7 @@ class GeminiSRTTranslator:
         self.secure_1psidts = secure_1psidts
         self.proxy = proxy
         self.browser = browser
+        self._webapi_client = None
 
         self.current_api_number = 1
         self.backup_api_number = 2
@@ -727,6 +732,20 @@ class GeminiSRTTranslator:
             server_overload_retries = 0
             max_overload_retries = 3
 
+            if self.use_webapi:
+                info_with_progress("Initializing Web API chat session...", isSending=True)
+                client = self._get_client()
+                client.start_chat()
+                sys_prompt = get_webapi_translate_system_prompt(
+                    language=self.target_language,
+                    thinking=self.thinking,
+                    thinking_compatible=True if self.thinking_level is not None else False,
+                    audio_file=self.audio_file,
+                    description=self.description,
+                )
+                success_with_progress("Initializing system instructions...", isSending=True)
+                client.send_message(sys_prompt)
+
             while i < total or len(batch) > 0:
                 if i < total and len(batch) < self.batch_size:
                     if offset_end - offset < self.audio_chunk_size:
@@ -932,9 +951,13 @@ class GeminiSRTTranslator:
             genai.Client or WebAPIClientWrapper: Configured Gemini client instance
         """
         if self.use_webapi:
+            if self._webapi_client is not None:
+                return self._webapi_client
+
             from .webapi_client import WebAPIClientWrapper
             try:
-                return WebAPIClientWrapper(self.secure_1psid, self.secure_1psidts, self.proxy, browser=self.browser)
+                self._webapi_client = WebAPIClientWrapper(self.secure_1psid, self.secure_1psidts, self.proxy, browser=self.browser)
+                return self._webapi_client
             except Exception as e:
                 error(f"Web API client failed to initialize: {e}\nHint: If using --browser, make sure you are logged into gemini.google.com in your default browser.", ignore_quiet=True)
                 exit(1)
@@ -1130,16 +1153,11 @@ class GeminiSRTTranslator:
             The raw translated JSON text to feed as an example into the next batch context
         """
         client = self._get_client()
-        from .helpers import build_webapi_translate_prompt
-        
         batch_str = json.dumps(batch, ensure_ascii=False)
         prompt = build_webapi_translate_prompt(
             language=self.target_language,
-            thinking=self.thinking,
-            thinking_compatible=True, # default to True for WebAPI
             current_batch=batch_str,
             previous_context=previous_context_str,
-            description=self.description
         )
         
         files = []
@@ -1158,7 +1176,7 @@ class GeminiSRTTranslator:
             retry += 1
             
             if not self.streaming:
-                response = client.generate_content(prompt, model=self.model_name, files=files)
+                response = client.send_message(prompt, files=files)
                 if not response.text:
                     error_with_progress("Gemini has returned an empty response.")
                     info_with_progress("Sending last batch again...", isSending=True)
@@ -1177,7 +1195,7 @@ class GeminiSRTTranslator:
                     
                 self.translated_batch = json_repair.loads(response_text)
             else:
-                response_stream = client.generate_content_stream(prompt, model=self.model_name, files=files)
+                response_stream = client.send_message_stream(prompt, files=files)
                 for chunk in response_stream:
                     if chunk.thoughts_delta:
                         update_loading_animation(chunk_size=chunk_size, isThinking=True)
@@ -1402,6 +1420,17 @@ class GeminiSRTTranslator:
 
             self._save_transcribe_progress(current_length)
 
+            if self.use_webapi:
+                info_with_progress("Initializing Web API transcription chat session...", isSending=True)
+                client.start_chat()
+                sys_prompt = get_webapi_transcribe_system_prompt(
+                    thinking=self.thinking,
+                    thinking_compatible=True if self.thinking_level is not None else False,
+                    description=self.description,
+                )
+                success_with_progress("Initializing system instructions...", isSending=True)
+                client.send_message(sys_prompt)
+
             while current_length < int(audio_length):
                 chunk_end = min(current_length + self.audio_chunk_size, int(audio_length))
                 audio_chunk = audio_file[current_length * 1000 : chunk_end * 1000].export(format="mp3").read()
@@ -1460,9 +1489,8 @@ class GeminiSRTTranslator:
                             retry += 1
                             if not self.streaming:
                                 if self.use_webapi:
-                                    from .helpers import build_webapi_transcribe_prompt
-                                    prompt = build_webapi_transcribe_prompt(self.thinking, True, self.description)
-                                    response = client.generate_content(prompt, model=self.model_name, files=[current_message])
+                                    prompt = build_webapi_transcribe_prompt(str(current_message) if isinstance(current_message, dict) else "Audio chunk")
+                                    response = client.send_message(prompt, files=[current_message])
                                     if not response.text:
                                         raise ValueError("Gemini has returned an empty response.")
                                     response_text = response.text
@@ -1504,9 +1532,8 @@ class GeminiSRTTranslator:
                                     break
                                 
                                 if self.use_webapi:
-                                    from .helpers import build_webapi_transcribe_prompt
-                                    prompt = build_webapi_transcribe_prompt(self.thinking, True, self.description)
-                                    response_stream = client.generate_content_stream(prompt, model=self.model_name, files=[current_message])
+                                    prompt = build_webapi_transcribe_prompt(str(current_message) if isinstance(current_message, dict) else "Audio chunk")
+                                    response_stream = client.send_message_stream(prompt, files=[current_message])
                                     for chunk in response_stream:
                                         if chunk.thoughts_delta:
                                             update_loading_animation(chunk_size=0, isThinking=True, isTranscribing=True)

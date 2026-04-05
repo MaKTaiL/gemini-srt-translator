@@ -292,18 +292,15 @@ def get_transcribe_response_schema() -> types.Schema:
 # WEB API PROMPT BUILDERS
 # ==============================================================================
 
-def build_webapi_translate_prompt(
+def get_webapi_translate_system_prompt(
     language: str,
     thinking: bool,
     thinking_compatible: bool,
-    current_batch: str,
-    previous_context: Optional[str] = None,
     audio_file: Optional[str] = None,
     description: Optional[str] = None,
 ) -> str:
     """
-    Builds a single prompt string for the Gemini Web API combining instructions,
-    context, and the actual batch data.
+    Builds the system instruction equivalent for the Gemini Web API chat session.
     """
     instruction = get_translate_instruction(
         language, thinking, thinking_compatible, audio_file, description
@@ -312,27 +309,51 @@ def build_webapi_translate_prompt(
     prompt = f"{instruction}\n\n"
     prompt += "CRITICAL: You MUST respond with ONLY a valid JSON array, strictly adhering to the requested schema. Do NOT wrap the JSON in Markdown formatting (```json ... ```) or provide any other conversational text.\n"
     prompt += "CRITICAL: DO NOT merge or drop any items! You must return the EXACT same number of items as provided in the input batch. Maintain all indexes.\n\n"
+    prompt += "Acknowledge these instructions and wait for the very first batch."
     
+    return prompt
+
+def build_webapi_translate_prompt(
+    language: str,
+    current_batch: str,
+    previous_context: Optional[str] = None,
+) -> str:
+    """
+    Builds the iterative prompt string for the Gemini Web API (only batch data).
+    """
+    prompt = ""
     if previous_context:
         prompt += f"--- PREVIOUS CONTEXT (For reference only, DO NOT translate these) ---\n{previous_context}\n\n"
         
-    prompt += f"--- TRANSLATION TASK (Translate these items to {language}) ---\n{current_batch}"
+    prompt += f"--- TRANSLATION TASK (Translate to {language}, remember to return ONLY a JSON array with exact count) ---\n{current_batch}"
     return prompt
 
 
-def build_webapi_transcribe_prompt(
+def get_webapi_transcribe_system_prompt(
     thinking: bool,
     thinking_compatible: bool,
     description: Optional[str] = None,
 ) -> str:
     """
-    Builds a single prompt string for the Gemini Web API for transcription.
+    Builds the system instruction equivalent for the Gemini Web API transcription session.
     """
     instruction = get_transcribe_instruction(thinking, thinking_compatible, description)
     
     prompt = f"{instruction}\n\n"
-    prompt += "CRITICAL: You MUST respond with ONLY a valid JSON array, strictly adhering to the requested schema. Do NOT wrap the JSON in Markdown formatting (```json ... ```) or provide any other conversational text."
+    prompt += "CRITICAL: You MUST respond with ONLY a valid JSON array, strictly adhering to the requested schema. Do NOT wrap the JSON in Markdown formatting (```json ... ```) or provide any other conversational text.\n"
+    prompt += "Acknowledge these instructions and wait for the very first audio or text chunks."
     
+    return prompt
+
+def build_webapi_transcribe_prompt(
+    current_batch: str,
+) -> str:
+    """
+    Builds the iterative prompt string for the Web API transcription.
+    """
+    prompt = "--- TRANSCRIBE THIS AUDIO / TEXT BATCH ---\n"
+    prompt += current_batch + "\n\n"
+    prompt += "Remember: Return ONLY a valid JSON array adhering to the schema."
     return prompt
 
 
