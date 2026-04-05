@@ -1269,22 +1269,36 @@ class GeminiSRTTranslator:
         indexes = [x["index"] for x in batch]
         last_translated_line = translated_lines[-1]
         for line in translated_lines:
-            if "text" not in line or "index" not in line:
+            # Handle cases where line is not a dictionary (e.g. LLM returned string fragments)
+            if not isinstance(line, dict):
+                continue
+                
+            # Smart key finding for 'text' and 'index'
+            text_key = next((k for k in line.keys() if k.lower() in ["text", "translation", "content", "msg"]), None)
+            index_key = next((k for k in line.keys() if k.lower() in ["index", "id"]), None)
+
+            if text_key is None or index_key is None:
                 if line != last_translated_line or finished:
                     raise ValueError(f"Gemini has returned a malformed object for line {int(indexes[i]) + 1}.")
                 else:
                     continue
-            if line["index"] not in indexes:
-                raise ValueError(f"Gemini has returned an unexpected line: {int(line['index']) + 1}.")
-            if line["text"] == "" and batch[i]["text"] != "":
+            
+            line_text = line[text_key]
+            line_index = str(line[index_key])
+
+            if line_index not in indexes:
+                raise ValueError(f"Gemini has returned an unexpected line: {line_index}.")
+            
+            if line_text == "" and batch[i]["text"] != "":
                 if line != last_translated_line or finished:
-                    raise ValueError(f"Gemini has returned an empty translation for line {int(line['index']) + 1}.")
+                    raise ValueError(f"Gemini has returned an empty translation for line {int(line_index) + 1}.")
                 else:
                     continue
-            if self._dominant_strong_direction(line["text"]) == "rtl":
-                translated_subtitle[int(line["index"])].content = f"\u202b{line['text']}\u202c"
+            
+            if self._dominant_strong_direction(line_text) == "rtl":
+                translated_subtitle[int(line_index)].content = f"\u202b{line_text}\u202c"
             else:
-                translated_subtitle[int(line["index"])].content = line["text"]
+                translated_subtitle[int(line_index)].content = line_text
             i += 1
 
     def _dominant_strong_direction(self, s: str) -> str:
