@@ -335,12 +335,15 @@ def build_webapi_translate_prompt(
     if is_continuation:
         prompt += "⚠️ CONTINUATION NOTICE: You are currently translating a very long subtitle file in parts. This is NOT the start of the file. Maintain terminology and tone consistency with previous sections. Do NOT skip any lines.\n\n"
         
-    prompt += "🛑 CRITICAL RULES FOR WEB API:\n"
-    prompt += "1. You MUST respond with ONLY a valid JSON array. No markdown, no conversational filler.\n"
-    prompt += "2. You MUST return the EXACT same number of items as the input. (If I give you 50 items, you return 50 items).\n"
-    prompt += "3. DO NOT MERGE lines. Even if a sentence is split across two items (e.g., 'the' and 'end'), translate them separately in their respective items. NEVER leave an item empty by merging its content into another.\n"
-    prompt += "4. EVERY single JSON object in your array MUST have a non-empty 'text' field (unless the source was empty).\n"
-    prompt += "5. Maintain all 'index' values exactly as they appear in the input.\n\n"
+    prompt += "🛑 STRICT JSON SCHEMA FOR WEB API:\n"
+    prompt += "Your entire output MUST be a JSON array of objects. NO conversational filler, NO Markdown (```json). \n"
+    prompt += "EXACT format per item:\n"
+    prompt += ' { "index": "...", "text": "..." }\n\n'
+    prompt += "1. NEVER change the key names. Use ONLY lowercase \"index\" and \"text\".\n"
+    prompt += "2. You MUST return the EXACT same number of items as given in the input.\n"
+    prompt += "3. DO NOT MERGE fragments. If a sentence is split, translate each part in its own item.\n"
+    prompt += "4. NO item should have an empty \"text\" (unless input was empty).\n"
+    prompt += "5. DO NOT escape Turkish characters (ç, ş, ğ, ü, ö, ı). Return them as literal characters.\n\n"
     
     if previous_context:
         prompt += f"--- PREVIOUS CONTEXT (For reference only, DO NOT translate these) ---\n{previous_context}\n\n"
