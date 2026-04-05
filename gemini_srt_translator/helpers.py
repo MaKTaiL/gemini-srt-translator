@@ -310,7 +310,8 @@ def build_webapi_translate_prompt(
     )
     
     prompt = f"{instruction}\n\n"
-    prompt += "CRITICAL: You MUST respond with ONLY a valid JSON array, strictly adhering to the requested schema. Do NOT wrap the JSON in Markdown formatting (```json ... ```) or provide any other conversational text.\n\n"
+    prompt += "CRITICAL: You MUST respond with ONLY a valid JSON array, strictly adhering to the requested schema. Do NOT wrap the JSON in Markdown formatting (```json ... ```) or provide any other conversational text.\n"
+    prompt += "CRITICAL: DO NOT merge or drop any items! You must return the EXACT same number of items as provided in the input batch. Maintain all indexes.\n\n"
     
     if previous_context:
         prompt += f"--- PREVIOUS CONTEXT (For reference only, DO NOT translate these) ---\n{previous_context}\n\n"
