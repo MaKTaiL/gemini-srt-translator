@@ -52,7 +52,7 @@ class WebAPIClientWrapper:
                 "Install it with: pip install gemini-webapi"
             )
 
-        if browser:
+        if browser and not secure_1psid:
             try:
                 import browser_cookie3
             except ImportError:
@@ -60,6 +60,7 @@ class WebAPIClientWrapper:
                     "browser_cookie3 package is required for browser cookie extraction. "
                     "Install it with: pip install browser_cookie3 or pip install gemini-webapi[browser]"
                 )
+            secure_1psid, secure_1psidts = self._extract_cookies_manually(browser_cookie3)
 
         # Create a dedicated event loop running in a daemon thread.
         self._loop = asyncio.new_event_loop()
@@ -69,14 +70,10 @@ class WebAPIClientWrapper:
         self._thread.start()
 
         # Initialise the async client synchronously.
-        if browser and not secure_1psid:
-            self._client = GeminiClient(proxy=proxy)
-            self._run_async(self._client.init(timeout=30, auto_close=False, auto_refresh=True, verbose=False))
-        else:
-            self._client = GeminiClient(
-                secure_1psid, secure_1psidts, proxy=proxy
-            )
-            self._run_async(self._client.init(verbose=False))
+        self._client = GeminiClient(
+            secure_1psid, secure_1psidts, proxy=proxy
+        )
+        self._run_async(self._client.init(timeout=35, auto_close=False, auto_refresh=False, verbose=False))
 
         # Chat session (optional, created via start_chat)
         self._chat = None
@@ -84,6 +81,34 @@ class WebAPIClientWrapper:
     # --------------------------------------------------------------------- #
     # Internal helpers
     # --------------------------------------------------------------------- #
+
+    def _extract_cookies_manually(self, browser_cookie3) -> tuple[Optional[str], Optional[str]]:
+        """Extract just the first valid Google cookies instead of appending all browsers."""
+        browsers = [
+            browser_cookie3.chrome,
+            browser_cookie3.firefox,
+            browser_cookie3.edge,
+            browser_cookie3.opera,
+            browser_cookie3.brave,
+            browser_cookie3.chromium,
+        ]
+        
+        for browser_fn in browsers:
+            try:
+                cj = browser_fn(domain_name=".google.com")
+                found_1psid, found_1psidts = None, None
+                for cookie in cj:
+                    if cookie.name == "__Secure-1PSID" and not cookie.is_expired(cookie.expires):
+                        found_1psid = cookie.value
+                    elif cookie.name == "__Secure-1PSIDTS" and not cookie.is_expired(cookie.expires):
+                        found_1psidts = cookie.value
+                
+                if found_1psid:
+                    return found_1psid, found_1psidts
+            except Exception:
+                continue
+                
+        return None, None
 
     def _run_async(self, coro):
         """Submit a coroutine to the background loop and block until done."""
