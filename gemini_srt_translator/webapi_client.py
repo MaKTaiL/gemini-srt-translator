@@ -224,7 +224,9 @@ class WebAPIClientWrapper:
         list
             List of ``AvailableModel`` objects (or ``None`` if unavailable).
         """
-        return self._client.list_models()
+        if hasattr(self._client, "list_models"):
+            return self._client.list_models()
+        return []
 
     # --------------------------------------------------------------------- #
     # Cleanup
