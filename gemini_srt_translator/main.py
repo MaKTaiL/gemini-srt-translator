@@ -1291,7 +1291,10 @@ class GeminiSRTTranslator:
             
             if line_text == "" and batch[i]["text"] != "":
                 if line != last_translated_line or finished:
-                    raise ValueError(f"Gemini has returned an empty translation for line {int(line_index) + 1}.")
+                    source_text = batch[i]["text"]
+                    raise ValueError(
+                        f"Gemini has returned an empty translation for line {int(line_index) + 1} (Source: '{source_text}')."
+                    )
                 else:
                     continue
             

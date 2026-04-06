@@ -61,15 +61,35 @@ def get_translate_instruction(
 - **Translate Text Only**: Only translate the value of the `text` field.
 - **Preserve Formatting**: Keep all existing formatting, including HTML tags (`<i>`, `<b>`) and line breaks (`\\n`).
 - **Handle Empty Text**: If a `text` field is empty or contains only whitespace, keep it unchanged.
-- **Maintain Integrity**:
-  - Number of items in the output must match the input.
-  - **Do NOT** alter any fields other than `text`.
-  - **Do NOT** add, remove, or reorder any items on the list.
-  - **Do NOT** merge text between different items. Original and translation must match.
+- **Strict Mapping**: You MUST return the EXACT same number of items as provided in the input batch. Each `index` in the input must have a corresponding `index` in the output.
+- **No Merging**: Do NOT merge separate items into one, even if they form a single sentence. Each fragment must be translated individually within its original item. If a sentence spans across multiple items, distribute the translation accordingly.
+- **No Empty Responses**: If the input `text` is not empty, the output `text` MUST NOT be empty. If an item contains only a filler or a fragment that is hard to translate in isolation, provide a meaningful translation or a placeholder that maintains the timing (e.g., an ellipsis `...`), but never return an empty string.
 """.format(
         section_number=section_number, language=language
     )
     prompt_parts.append(core_rules)
+
+    # --- Section 4: Few-Shot Example for Split Sentences ---
+    section_number += 1
+    split_example = f"""
+## {section_number}. Example of Handling Split Sentences and Fillers
+If the input is:
+```json
+[
+  {{ "index": "54", "text": "you're running a process in that single" }},
+  {{ "index": "55", "text": "address space uh" }}
+]
+```
+The output should be:
+```json
+[
+  {{ "index": "54", "text": "bu tek adres alanında bir süreç çalıştırırken" }},
+  {{ "index": "55", "text": "adres alanı ıı" }}
+]
+```
+Note how the translation is distributed across both lines to maintain the 1:1 mapping and the "uh" is translated to "ıı".
+"""
+    prompt_parts.append(split_example)
 
     # --- Section 4: Advanced Rules (Conditional) ---
     if audio_file:
