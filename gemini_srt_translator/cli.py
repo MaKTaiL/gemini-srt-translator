@@ -57,9 +57,16 @@ def select_model_interactive(available_models: list) -> str:
 
 def cmd_translate(args) -> None:
     """Handle translate command."""
-    # Set API keys
-    gst.gemini_api_key = args.api_key or get_api_key_from_env("GEMINI_API_KEY") or get_api_key_from_input()
-    gst.gemini_api_key2 = args.api_key2 or get_api_key_from_env("GEMINI_API_KEY2")
+    # Set API keys and Web API params
+    gst.use_webapi = getattr(args, "webapi", False)
+    gst.secure_1psid = getattr(args, "secure_1psid", None) or get_api_key_from_env("SECURE_1PSID")
+    gst.secure_1psidts = getattr(args, "secure_1psidts", None) or get_api_key_from_env("SECURE_1PSIDTS")
+    gst.proxy = getattr(args, "proxy", None) or get_api_key_from_env("GEMINI_PROXY")
+    gst.browser = getattr(args, "browser", False)
+
+    if not gst.use_webapi:
+        gst.gemini_api_key = args.api_key or get_api_key_from_env("GEMINI_API_KEY") or get_api_key_from_input()
+        gst.gemini_api_key2 = args.api_key2 or get_api_key_from_env("GEMINI_API_KEY2")
 
     # Validate input file
     if args.input_file:
@@ -143,7 +150,14 @@ def cmd_translate(args) -> None:
 
 def cmd_list_models(args) -> None:
     """Handle list-models command."""
-    gst.gemini_api_key = args.api_key or get_api_key_from_env("GEMINI_API_KEY") or get_api_key_from_input()
+    gst.use_webapi = getattr(args, "webapi", False)
+    gst.secure_1psid = getattr(args, "secure_1psid", None) or get_api_key_from_env("SECURE_1PSID")
+    gst.secure_1psidts = getattr(args, "secure_1psidts", None) or get_api_key_from_env("SECURE_1PSIDTS")
+    gst.proxy = getattr(args, "proxy", None) or get_api_key_from_env("GEMINI_PROXY")
+    gst.browser = getattr(args, "browser", False)
+
+    if not gst.use_webapi:
+        gst.gemini_api_key = args.api_key or get_api_key_from_env("GEMINI_API_KEY") or get_api_key_from_input()
 
     try:
         gst.listmodels()
@@ -178,7 +192,14 @@ def cmd_extract(args) -> None:
 
 def cmd_transcribe(args) -> None:
     """Handle transcribe command."""
-    gst.gemini_api_key = args.api_key or get_api_key_from_env("GEMINI_API_KEY") or get_api_key_from_input()
+    gst.use_webapi = getattr(args, "webapi", False)
+    gst.secure_1psid = getattr(args, "secure_1psid", None) or get_api_key_from_env("SECURE_1PSID")
+    gst.secure_1psidts = getattr(args, "secure_1psidts", None) or get_api_key_from_env("SECURE_1PSIDTS")
+    gst.proxy = getattr(args, "proxy", None) or get_api_key_from_env("GEMINI_PROXY")
+    gst.browser = getattr(args, "browser", False)
+
+    if not gst.use_webapi:
+        gst.gemini_api_key = args.api_key or get_api_key_from_env("GEMINI_API_KEY") or get_api_key_from_input()
 
     if args.video_file:
         if not validate_file_path(args.video_file):
@@ -274,6 +295,14 @@ Examples:
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
+    def add_webapi_args(p):
+        webapi_group = p.add_argument_group("Web API arguments (optional)")
+        webapi_group.add_argument("--webapi", action="store_true", help="Use Gemini Web API instead of official SDK")
+        webapi_group.add_argument("--secure-1psid", help="__Secure-1PSID cookie for Web API")
+        webapi_group.add_argument("--secure-1psidts", help="__Secure-1PSIDTS cookie for Web API")
+        webapi_group.add_argument("--proxy", help="Proxy address for Web API")
+        webapi_group.add_argument("--browser", action="store_true", help="Automatically authenticate by pulling cookies from your local browser")
+
     # Translate command
     translate_parser = subparsers.add_parser("translate", help="Translate subtitle files")
     required_group_translate = translate_parser.add_argument_group("required arguments")
@@ -315,6 +344,7 @@ Examples:
     translate_parser.add_argument(
         "--extract-audio", action="store_true", default=None, help="Extract audio from video for context"
     )
+    add_webapi_args(translate_parser)
 
     # Extract audio command
     extract_parser = subparsers.add_parser("extract", help="Extract audio and/or srt from video file")
@@ -350,10 +380,12 @@ Examples:
     transcribe_parser.add_argument(
         "--interactive", action="store_true", default=None, help="Interactive model selection"
     )
+    add_webapi_args(transcribe_parser)
 
     # List models command
     list_parser = subparsers.add_parser("list-models", help="List available Gemini models")
     list_parser.add_argument("-k", "--api-key", help="Gemini API key")
+    add_webapi_args(list_parser)
 
     return parser
 

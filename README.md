@@ -12,15 +12,16 @@
 
 ## ✨ Overview
 
-**Gemini SRT Translator** is a powerful python tool to translate subtitle files using the power of Google Gemini AI. Perfect for anyone needing fast, accurate, and customizable translations for videos, movies, and series.
+**Gemini SRT Translator** is a powerful Python tool for translating subtitle files and transcribing audio using the power of Google Gemini AI. It supports both the **Official Google AI SDK** (with an API key) and a **Web API backend** (via browser cookies), making it flexible for all users. Perfect for anyone needing fast, accurate, and customizable translations for videos, movies, and series.
 
 ---
 
 - 🔤 **SRT Translation**: Translate `.srt` subtitle files to a wide range of languages supported by Google Gemini AI.
 - 🎙️ **Transcription**: Transcribe audio or video files directly into SRT subtitles using Gemini's audio capabilities.
+- 🌐 **Web API Support**: Use Gemini through your browser session (cookies) instead of an official API key, ideal for bypassing SDK limitations or for personal use.
 - ⏱️ **Timing & Format**: Ensures that the translated subtitles maintain the exact timestamps and basic SRT formatting of the original file.
 - 💾 **Quick Resume**: Easily resume interrupted translations from where you left off.
-- 🧠 **Advanced AI**: Leverages thinking and reasoning capabilities for more contextually accurate translations (available on Gemini 2.5 models).
+- 🧠 **Advanced AI**: Leverages multi-turn chat sessions and reasoning capabilities for more contextually accurate and consistent translations.
 - 🖥️ **CLI Support**: Full command-line interface for easy automation and scripting.
 - ⚙️ **Customizable**: Tune model parameters, adjust batch size, and access other advanced settings.
 - 🎞️ **SRT Extraction**: Extract and translate SRT subtitles from video files automatically (requires [FFmpeg](https://ffmpeg.org/)).
@@ -56,6 +57,14 @@ source venv/bin/activate
 
 # Install inside the virtual environment
 pip install --upgrade gemini-srt-translator
+```
+
+### Web API Backend (Optional)
+
+If you'd like to use the alternative Web API backend without an official SDK api key, install the optional extra:
+
+```sh
+pip install --upgrade "gemini-srt-translator[webapi]"
 ```
 
 ---
@@ -112,6 +121,21 @@ You can provide your API key in several ways:
    gst.gemini_api_key = "your_api_key_here"
    ```
 
+### 🍪 Web API Cookies (Optional Backend)
+
+If you want to use the `--webapi` mode, you don't need a formal API key. Instead, you authenticate using your Gemini browser cookies (`__Secure-1PSID`).
+
+1. **Automatic (Recommended)**: Use the `--browser` flag, and the tool will automatically pull the cookies from your local Chrome/Edge/Firefox browser (Make sure you are logged into gemini.google.com).
+2. **Manual Environment Variable**: Set the `SECURE_1PSID` environment variable.
+   ```bash
+   export SECURE_1PSID="your_1psid_cookie_here"
+   export SECURE_1PSIDTS="your_1psidts_cookie_here" # Optional
+   ```
+3. **Command Line Argument**: Pass it manually using the flag
+   ```bash
+   gst translate -i subtitle.srt -l French --webapi --secure-1psid "your_cookie"
+   ```
+
 ---
 
 ## 🚀 Quick Start
@@ -145,6 +169,9 @@ gst translate -i subtitle.srt -l French --start-line 20
 
 # Suppress output
 gst translate -i subtitle.srt -l French --quiet
+
+# Use Web API backend with automatic browser cookie extraction
+gst translate -i subtitle.srt -l French --webapi --browser
 ```
 
 #### Advanced Options
@@ -254,6 +281,19 @@ gst.model_name = "gemini-2.5-flash"
 gst.transcribe()
 ```
 
+#### Transcribing Audio Using Web API
+
+```python
+import gemini_srt_translator as gst
+
+gst.use_webapi = True
+gst.browser = True # Automatically extracts credentials from your browser
+gst.audio_file = "audio.mp3"
+gst.output_file = "transcription.srt"
+
+gst.transcribe()
+```
+
 #### Extracting from Video
 
 ```python
@@ -279,6 +319,11 @@ gst.extract("audio")
 #### 🔧 GST Parameters
 
 - `gemini_api_key2`: Second key for more quota (useful for free Pro models).
+- `use_webapi`: Use the alternative Web API backend (default: False).
+- `browser`: Automatically extract authentication cookies from your local browser for Web API mode (default: False).
+- `secure_1psid`: The `__Secure-1PSID` cookie value for Web API.
+- `secure_1psidts`: The `__Secure-1PSIDTS` cookie value for Web API (optional).
+- `proxy`: Custom proxy address for the Web API (optional).
 - `video_file`: Path to a video file to extract subtitles and/or audio for context (requires [FFmpeg](https://ffmpeg.org/)).
 - `audio_file`: Path to an audio file to use as context for translation (requires [FFmpeg](https://ffmpeg.org/)).
 - `extract_audio`: Whether to extract and use audio context from the video file (default: False).
@@ -393,5 +438,6 @@ Thank you to all who have contributed to this project:
 - [angelitto2005](https://github.com/angelitto2005)
 - [sjiampojamarn](https://github.com/sjiampojamarn)
 - [mkaflowski](https://github.com/mkaflowski)
+- [fr0stb1rd](https://github.com/fr0stb1rd)
 
 Special thanks to all users who have reported issues, suggested features, and helped improve the project.

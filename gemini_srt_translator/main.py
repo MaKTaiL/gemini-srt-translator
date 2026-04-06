@@ -44,11 +44,15 @@ from .ffmpeg_utils import (
     get_audio_length,
 )
 from .helpers import (
+    build_webapi_translate_prompt,
+    build_webapi_transcribe_prompt,
     get_safety_settings,
     get_transcribe_instruction,
     get_transcribe_response_schema,
     get_translate_instruction,
     get_translate_response_schema,
+    get_webapi_translate_system_prompt,
+    get_webapi_transcribe_system_prompt,
 )
 from .utils import convert_timedelta_to_timestamp, convert_timestamp_to_timedelta
 
@@ -97,6 +101,11 @@ class GeminiSRTTranslator:
         progress_log: bool = False,
         thoughts_log: bool = False,
         resume: bool = None,
+        use_webapi: bool = False,
+        secure_1psid: str = None,
+        secure_1psidts: str = None,
+        proxy: str = None,
+        browser: bool = False,
     ):
         """
         Initialize the translator with necessary parameters.
@@ -149,6 +158,12 @@ class GeminiSRTTranslator:
         self.thoughts_log = thoughts_log
         self.resume = resume
         self.use_colors = use_colors
+        self.use_webapi = use_webapi
+        self.secure_1psid = secure_1psid
+        self.secure_1psidts = secure_1psidts
+        self.proxy = proxy
+        self.browser = browser
+        self._webapi_client = None
 
         self.current_api_number = 1
         self.backup_api_number = 2
@@ -424,11 +439,25 @@ class GeminiSRTTranslator:
 
     def getmodels(self):
         """Get available Gemini models that support content generation."""
-        if not self.current_api_key:
+        if not self.use_webapi and not self.current_api_key:
             error("Please provide a valid Gemini API key.")
+            exit(1)
+        elif self.use_webapi and not self.secure_1psid and not self.browser:
+            error("Please provide a valid __Secure-1PSID cookie for Web API or use --browser argument.")
             exit(1)
 
         client = self._get_client()
+        
+        if self.use_webapi:
+            models = client.list_models()
+            if models:
+                return [m.model_name for m in models if m.is_available]
+            return [
+                "gemini-3.1-pro", "gemini-3.0-flash", "gemini-3.0-flash-thinking", "unspecified",
+                "gemini-3-flash", "gemini-3-pro", "gemini-3-flash-thinking",
+                "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-2.0-pro"
+            ]
+
         models = client.models.list()
         list_models = []
         for model in models:
@@ -472,8 +501,11 @@ class GeminiSRTTranslator:
                 exit(1)
             self.srt_extracted = True
 
-        if not self.current_api_key:
+        if not self.use_webapi and not self.current_api_key:
             error("Please provide a valid Gemini API key.", ignore_quiet=True)
+            exit(1)
+        elif self.use_webapi and not self.secure_1psid and not self.browser:
+            error("Please provide a valid __Secure-1PSID cookie for Web API or use --browser.", ignore_quiet=True)
             exit(1)
 
         if not self.target_language:
@@ -529,7 +561,8 @@ class GeminiSRTTranslator:
             error(f"Model {self.model_name} is not available. Please choose a different model.", ignore_quiet=True)
             exit(1)
 
-        self._get_token_limit()
+        if not self.use_webapi:
+            self._get_token_limit()
 
         with open(self.input_file, "r", encoding="utf-8") as original_file:
             original_text = original_file.read()
@@ -601,7 +634,7 @@ class GeminiSRTTranslator:
             i = self.start_line - 1
             total = len(original_subtitle)
             batch = []
-            previous_message = []
+            previous_message = "" if self.use_webapi else []
             if self.start_line > 1:
                 start_idx = max(0, self.start_line - 2 - self.batch_size)
                 parts_user = []
@@ -648,16 +681,19 @@ class GeminiSRTTranslator:
                     )
                 )
 
-                previous_message = [
-                    types.Content(
-                        role="user",
-                        parts=parts_user,
-                    ),
-                    types.Content(
-                        role="model",
-                        parts=parts_model,
-                    ),
-                ]
+                if self.use_webapi:
+                    previous_message = f"--- PREVIOUS CONTEXT ---\nInput: {json.dumps(subtitle_array, ensure_ascii=False)}\nOutput: {json.dumps([SubtitleObject(index=str(j), text=translated_subtitle[j].content) for j in range(start_idx, self.start_line - 1)], ensure_ascii=False)}"
+                else:
+                    previous_message = [
+                        types.Content(
+                            role="user",
+                            parts=parts_user,
+                        ),
+                        types.Content(
+                            role="model",
+                            parts=parts_model,
+                        ),
+                    ]
 
             highlight(f"Starting translation of {total - self.start_line + 1} lines...\n")
             if self.use_colors:
@@ -696,6 +732,20 @@ class GeminiSRTTranslator:
             server_overload_retries = 0
             max_overload_retries = 3
 
+            if self.use_webapi:
+                info_with_progress("Initializing Web API chat session...", isSending=True)
+                client = self._get_client()
+                client.start_chat()
+                sys_prompt = get_webapi_translate_system_prompt(
+                    language=self.target_language,
+                    thinking=self.thinking,
+                    thinking_compatible=True if self.thinking_level is not None else False,
+                    audio_file=self.audio_file,
+                    description=self.description,
+                )
+                success_with_progress("Initializing system instructions...", isSending=True)
+                client.send_message(sys_prompt)
+
             while i < total or len(batch) > 0:
                 if i < total and len(batch) < self.batch_size:
                     if offset_end - offset < self.audio_chunk_size:
@@ -725,7 +775,10 @@ class GeminiSRTTranslator:
                     while not validated:
                         info_with_progress(f"Validating token size...")
                         try:
-                            validated = self._validate_token_size(json.dumps(batch, ensure_ascii=False))
+                            if not self.use_webapi:
+                                validated = self._validate_token_size(json.dumps(batch, ensure_ascii=False))
+                            else:
+                                validated = True
                         except Exception as e:
                             error_with_progress(f"Error validating token size: {e}")
                             info_with_progress(f"Retrying validation...")
@@ -759,10 +812,16 @@ class GeminiSRTTranslator:
 
                     if self.audio:
                         audio_bytes = self.audio[offset * 1000 : offset_end * 1000].export(format="mp3").read()
-                        self.audio_part = types.Part.from_bytes(data=audio_bytes, mime_type="audio/mp3")
+                        if self.use_webapi:
+                            self.audio_part = audio_bytes
+                        else:
+                            self.audio_part = types.Part.from_bytes(data=audio_bytes, mime_type="audio/mp3")
 
                     start_time = time.time()
-                    previous_message = self._process_batch(batch, previous_message, translated_subtitle)
+                    if self.use_webapi:
+                        previous_message = self._process_batch_webapi(batch, previous_message, translated_subtitle)
+                    else:
+                        previous_message = self._process_batch(batch, previous_message, translated_subtitle)
                     end_time = time.time()
                     offset = offset_end
 
@@ -884,13 +943,25 @@ class GeminiSRTTranslator:
             return True
         return False
 
-    def _get_client(self) -> genai.Client:
+    def _get_client(self):
         """
         Configure and return a Gemini client instance.
 
         Returns:
-            genai.Client: Configured Gemini client instance
+            genai.Client or WebAPIClientWrapper: Configured Gemini client instance
         """
+        if self.use_webapi:
+            if self._webapi_client is not None:
+                return self._webapi_client
+
+            from .webapi_client import WebAPIClientWrapper
+            try:
+                self._webapi_client = WebAPIClientWrapper(self.secure_1psid, self.secure_1psidts, self.proxy, browser=self.browser)
+                return self._webapi_client
+            except Exception as e:
+                error(f"Web API client failed to initialize: {e}\nHint: If using --browser, make sure you are logged into gemini.google.com in your default browser.", ignore_quiet=True)
+                exit(1)
+            
         client = genai.Client(api_key=self.current_api_key)
         return client
 
@@ -1064,6 +1135,117 @@ class GeminiSRTTranslator:
         batch.clear()
         return previous_content
 
+    def _process_batch_webapi(
+        self,
+        batch: list[SubtitleObject],
+        previous_context_str: str,
+        translated_subtitle: list[Subtitle],
+    ) -> str:
+        """
+        Process a batch of subtitles for translation using Gemini Web API.
+
+        Args:
+            batch: Batch of subtitles to translate
+            previous_context_str: Previous translated batch text for context
+            translated_subtitle: List to store translated subtitles
+            
+        Returns:
+            The raw translated JSON text to feed as an example into the next batch context
+        """
+        client = self._get_client()
+        batch_str = json.dumps(batch, ensure_ascii=False)
+        prompt = build_webapi_translate_prompt(
+            language=self.target_language,
+            thinking=self.thinking,
+            thinking_compatible=True if self.thinking_level is not None else False,
+            current_batch=batch_str,
+            previous_context=previous_context_str,
+            audio_file=self.audio_file,
+            description=self.description,
+            is_continuation=self.batch_number > 1
+        )
+        
+        files = []
+        if self.audio_part:
+            files.append(self.audio_part)
+
+        done = False
+        retry = -1
+        while not done:
+            response_text = ""
+            thoughts_text = ""
+            chunk_size = 0
+            self.translated_batch = []
+            processed = True
+            done_thinking = False
+            retry += 1
+            
+            if not self.streaming:
+                response = client.send_message(prompt, files=files)
+                if not response.text:
+                    error_with_progress("Gemini has returned an empty response.")
+                    info_with_progress("Sending last batch again...", isSending=True)
+                    continue
+                    
+                response_text = response.text
+                if response.thoughts:
+                    thoughts_text = response.thoughts
+                    
+                if self.thoughts_log and self.thinking:
+                    if retry == 0:
+                        info_with_progress(f"Batch {self.batch_number} thinking process saved to file.")
+                    else:
+                        info_with_progress(f"Batch {self.batch_number}.{retry} thinking process saved to file.")
+                    save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
+                    
+                self.translated_batch = json_repair.loads(response_text)
+            else:
+                response_stream = client.send_message_stream(prompt, files=files)
+                for chunk in response_stream:
+                    if chunk.thoughts_delta:
+                        update_loading_animation(chunk_size=chunk_size, isThinking=True)
+                        thoughts_text += chunk.thoughts_delta
+                    
+                    if chunk.text_delta:
+                        if not done_thinking and self.thoughts_log and self.thinking and thoughts_text:
+                            if retry == 0:
+                                info_with_progress(f"Batch {self.batch_number} thinking process saved to file.")
+                            else:
+                                info_with_progress(f"Batch {self.batch_number}.{retry} thinking process saved to file.")
+                            save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
+                            done_thinking = True
+                            
+                        response_text += chunk.text_delta
+                        self.translated_batch = json_repair.loads(response_text)
+                        
+                    chunk_size = len(self.translated_batch)
+                    if chunk_size > 0:
+                        self._process_translated_lines(
+                            translated_lines=self.translated_batch,
+                            translated_subtitle=translated_subtitle,
+                            batch=batch,
+                            finished=False,
+                        )
+                        update_loading_animation(chunk_size=chunk_size)
+
+            if len(self.translated_batch) == len(batch):
+                self._process_translated_lines(
+                    translated_lines=self.translated_batch,
+                    translated_subtitle=translated_subtitle,
+                    batch=batch,
+                    finished=True,
+                )
+                done = True
+                self.batch_number += 1
+            else:
+                if processed:
+                    raise ValueError(f"Expected {len(batch)} lines, got {len(self.translated_batch)}.")
+                    
+        batch.clear()
+        
+        # Return the simplified mapping text for context
+        return f"Input: {batch_str}\\nOutput: {response_text}"
+
     def _process_translated_lines(
         self,
         translated_lines: list[SubtitleObject],
@@ -1087,22 +1269,39 @@ class GeminiSRTTranslator:
         indexes = [x["index"] for x in batch]
         last_translated_line = translated_lines[-1]
         for line in translated_lines:
-            if "text" not in line or "index" not in line:
+            # Handle cases where line is not a dictionary (e.g. LLM returned string fragments)
+            if not isinstance(line, dict):
+                continue
+                
+            # Smart key finding for 'text' and 'index'
+            text_key = next((k for k in line.keys() if k.lower() in ["text", "translation", "content", "msg"]), None)
+            index_key = next((k for k in line.keys() if k.lower() in ["index", "id"]), None)
+
+            if text_key is None or index_key is None:
                 if line != last_translated_line or finished:
                     raise ValueError(f"Gemini has returned a malformed object for line {int(indexes[i]) + 1}.")
                 else:
                     continue
-            if line["index"] not in indexes:
-                raise ValueError(f"Gemini has returned an unexpected line: {int(line['index']) + 1}.")
-            if line["text"] == "" and batch[i]["text"] != "":
+            
+            line_text = line[text_key]
+            line_index = str(line[index_key])
+
+            if line_index not in indexes:
+                raise ValueError(f"Gemini has returned an unexpected line: {line_index}.")
+            
+            if line_text == "" and batch[i]["text"] != "":
                 if line != last_translated_line or finished:
-                    raise ValueError(f"Gemini has returned an empty translation for line {int(line['index']) + 1}.")
+                    source_text = batch[i]["text"]
+                    raise ValueError(
+                        f"Gemini has returned an empty translation for line {int(line_index) + 1} (Source: '{source_text}')."
+                    )
                 else:
                     continue
-            if self._dominant_strong_direction(line["text"]) == "rtl":
-                translated_subtitle[int(line["index"])].content = f"\u202b{line['text']}\u202c"
+            
+            if self._dominant_strong_direction(line_text) == "rtl":
+                translated_subtitle[int(line_index)].content = f"\u202b{line_text}\u202c"
             else:
-                translated_subtitle[int(line["index"])].content = line["text"]
+                translated_subtitle[int(line_index)].content = line_text
             i += 1
 
     def _dominant_strong_direction(self, s: str) -> str:
@@ -1166,8 +1365,11 @@ class GeminiSRTTranslator:
             error(f"Audio file {self.audio_file} does not exist.", ignore_quiet=True)
             exit(1)
 
-        if not self.current_api_key:
+        if not self.use_webapi and not self.current_api_key:
             error("Please provide a valid Gemini API key for transcription.", ignore_quiet=True)
+            exit(1)
+        elif self.use_webapi and not self.secure_1psid and not self.browser:
+            error("Please provide a valid __Secure-1PSID cookie for Web API transcription or use --browser.", ignore_quiet=True)
             exit(1)
 
         if "gemini" not in self.model_name or ("2.5" not in self.model_name and "3" not in self.model_name):
@@ -1240,11 +1442,25 @@ class GeminiSRTTranslator:
 
             self._save_transcribe_progress(current_length)
 
+            if self.use_webapi:
+                info_with_progress("Initializing Web API transcription chat session...", isSending=True)
+                client.start_chat()
+                sys_prompt = get_webapi_transcribe_system_prompt(
+                    thinking=self.thinking,
+                    thinking_compatible=True if self.thinking_level is not None else False,
+                    description=self.description,
+                )
+                success_with_progress("Initializing system instructions...", isSending=True)
+                client.send_message(sys_prompt)
+
             while current_length < int(audio_length):
                 chunk_end = min(current_length + self.audio_chunk_size, int(audio_length))
                 audio_chunk = audio_file[current_length * 1000 : chunk_end * 1000].export(format="mp3").read()
-                audio_part = types.Part.from_bytes(data=audio_chunk, mime_type="audio/mp3")
-                current_message = types.Content(role="user", parts=[audio_part])
+                if self.use_webapi:
+                    current_message = audio_chunk
+                else:
+                    audio_part = types.Part.from_bytes(data=audio_chunk, mime_type="audio/mp3")
+                    current_message = types.Content(role="user", parts=[audio_part])
                 progress_bar(
                     current_length,
                     audio_length,
@@ -1294,24 +1510,39 @@ class GeminiSRTTranslator:
                             thoughts_text = ""
                             retry += 1
                             if not self.streaming:
-                                response = client.models.generate_content(
-                                    model=self.model_name,
-                                    contents=[current_message],
-                                    config=self._get_transcribe_config(),
-                                )
-                                if response.prompt_feedback:
-                                    blocked = True
-                                    break
-                                if not response.text:
-                                    raise ValueError("Gemini has returned an empty response.")
-                                for part in response.candidates[0].content.parts:
-                                    if not part.text:
-                                        continue
-                                    elif part.thought:
-                                        thoughts_text += part.text
-                                        continue
-                                    else:
-                                        response_text += part.text
+                                if self.use_webapi:
+                                    prompt = build_webapi_transcribe_prompt(
+                                        self.thinking,
+                                        True if self.thinking_level is not None else False,
+                                        str(current_message) if isinstance(current_message, dict) else "Audio chunk",
+                                        description=self.description,
+                                        is_continuation=index > 1
+                                    )
+                                    response = client.send_message(prompt, files=[current_message])
+                                    if not response.text:
+                                        raise ValueError("Gemini has returned an empty response.")
+                                    response_text = response.text
+                                    thoughts_text = response.thoughts or ""
+                                else:
+                                    response = client.models.generate_content(
+                                        model=self.model_name,
+                                        contents=[current_message],
+                                        config=self._get_transcribe_config(),
+                                    )
+                                    if response.prompt_feedback:
+                                        blocked = True
+                                        break
+                                    if not response.text:
+                                        raise ValueError("Gemini has returned an empty response.")
+                                    for part in response.candidates[0].content.parts:
+                                        if not part.text:
+                                            continue
+                                        elif part.thought:
+                                            thoughts_text += part.text
+                                            continue
+                                        else:
+                                            response_text += part.text
+                                            
                                 if self.thoughts_log and self.thinking:
                                     if retry == 0:
                                         info_with_progress(
@@ -1327,49 +1558,81 @@ class GeminiSRTTranslator:
                             else:
                                 if blocked:
                                     break
-                                response = client.models.generate_content_stream(
-                                    model=self.model_name,
-                                    contents=[current_message],
-                                    config=self._get_transcribe_config(),
-                                )
-                                for chunk in response:
-                                    if chunk.prompt_feedback:
-                                        blocked = True
-                                        break
-                                    if chunk.candidates[0].content.parts:
-                                        for part in chunk.candidates[0].content.parts:
-                                            if not part.text:
-                                                continue
-                                            if part.thought:
-                                                thoughts_text += part.text
-                                                update_loading_animation(
-                                                    chunk_size=0, isThinking=True, isTranscribing=True
-                                                )
-                                            else:
-                                                if not done_thinking and self.thoughts_log and self.thinking:
-                                                    if retry == 0:
-                                                        info_with_progress(
-                                                            f"Batch {self.batch_number} thinking process saved to file.",
-                                                            isTranscribing=True,
-                                                        )
-                                                    else:
-                                                        info_with_progress(
-                                                            f"Batch {self.batch_number}.{retry} thinking process saved to file.",
-                                                            isTranscribing=True,
-                                                        )
-                                                    save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
-                                                    done_thinking = True
-                                                response_text += part.text
-                                                transcription_json = json_repair.loads(response_text)
-                                                if len(transcription_json) > 1:
-                                                    if "time_end" in transcription_json[-2]:
-                                                        ts_for_anim = _normalize_timestamp(
-                                                            transcription_json[-2]["time_end"]
-                                                        )
-                                                        processed_seconds = convert_timestamp_to_timedelta(
-                                                            ts_for_anim
-                                                        ).total_seconds()
-                                                        update_loading_animation(processed_seconds, isTranscribing=True)
+                                
+                                if self.use_webapi:
+                                    prompt = build_webapi_transcribe_prompt(
+                                        self.thinking,
+                                        True if self.thinking_level is not None else False,
+                                        str(current_message) if isinstance(current_message, dict) else "Audio chunk",
+                                        description=self.description,
+                                        is_continuation=index > 1
+                                    )
+                                    response_stream = client.send_message_stream(prompt, files=[current_message])
+                                    for chunk in response_stream:
+                                        if chunk.thoughts_delta:
+                                            update_loading_animation(chunk_size=0, isThinking=True, isTranscribing=True)
+                                            thoughts_text += chunk.thoughts_delta
+                                        if chunk.text_delta:
+                                            if not done_thinking and self.thoughts_log and self.thinking and thoughts_text:
+                                                if retry == 0:
+                                                    info_with_progress(f"Batch {self.batch_number} thinking process saved to file.", isTranscribing=True)
+                                                else:
+                                                    info_with_progress(f"Batch {self.batch_number}.{retry} thinking process saved to file.", isTranscribing=True)
+                                                save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
+                                                done_thinking = True
+                                            response_text += chunk.text_delta
+                                            transcription_json = json_repair.loads(response_text)
+                                            if len(transcription_json) > 1:
+                                                if "time_end" in transcription_json[-2]:
+                                                    ts_for_anim = _normalize_timestamp(transcription_json[-2]["time_end"])
+                                                    processed_seconds = convert_timestamp_to_timedelta(ts_for_anim).total_seconds()
+                                                    update_loading_animation(int(processed_seconds), isTranscribing=True)
+                                else:
+                                    response = client.models.generate_content_stream(
+                                        model=self.model_name,
+                                        contents=[current_message],
+                                        config=self._get_transcribe_config(),
+                                    )
+                                    for chunk in response:
+                                        if chunk.prompt_feedback:
+                                            blocked = True
+                                            break
+                                        if chunk.candidates[0].content.parts:
+                                            for part in chunk.candidates[0].content.parts:
+                                                if not part.text:
+                                                    continue
+                                                if part.thought:
+                                                    thoughts_text += part.text
+                                                    update_loading_animation(
+                                                        chunk_size=0, isThinking=True, isTranscribing=True
+                                                    )
+                                                else:
+                                                    if not done_thinking and self.thoughts_log and self.thinking:
+                                                        if retry == 0:
+                                                            info_with_progress(
+                                                                f"Batch {self.batch_number} thinking process saved to file.",
+                                                                isTranscribing=True,
+                                                            )
+                                                        else:
+                                                            info_with_progress(
+                                                                f"Batch {self.batch_number}.{retry} thinking process saved to file.",
+                                                                isTranscribing=True,
+                                                            )
+                                                        save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
+                                                        done_thinking = True
+                                                    response_text += part.text
+                                                    transcription_json = json_repair.loads(response_text)
+                                                    if len(transcription_json) > 1:
+                                                        if "time_end" in transcription_json[-2]:
+                                                            ts_for_anim = _normalize_timestamp(
+                                                                transcription_json[-2]["time_end"]
+                                                            )
+                                                            processed_seconds = convert_timestamp_to_timedelta(
+                                                                ts_for_anim
+                                                            ).total_seconds()
+                                                            update_loading_animation(
+                                                                int(processed_seconds), isTranscribing=True
+                                                            )
 
                             if blocked:
                                 raise Exception("Content blocked by the API.")
