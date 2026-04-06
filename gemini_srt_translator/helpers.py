@@ -72,7 +72,7 @@ def get_translate_instruction(
     # --- Section 4: Few-Shot Example for Split Sentences ---
     section_number += 1
     split_example = f"""
-## {section_number}. Example of Handling Split Sentences and Fillers
+## {section_number}. Example of Handling Split Sentences
 If the input is:
 ```json
 [
@@ -83,11 +83,11 @@ If the input is:
 The output should be:
 ```json
 [
-  {{ "index": "54", "text": "bu tek adres alanında bir süreç çalıştırırken" }},
-  {{ "index": "55", "text": "adres alanı ıı" }}
+  {{ "index": "54", "text": "bu tek" }},
+  {{ "index": "55", "text": "adres alanı" }}
 ]
 ```
-Note how the translation is distributed across both lines to maintain the 1:1 mapping and the "uh" is translated to "ıı".
+Note how the translation is distributed across both lines to maintain the 1:1 mapping.
 """
     prompt_parts.append(split_example)
 
