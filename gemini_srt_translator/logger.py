@@ -138,7 +138,10 @@ def input_prompt(message: Any, mode: str = None, max_length: int = 0) -> str:
             return "y"
         if mode == "line":
             if int(_line_number) < 1 or int(_line_number) > max_length:
-                error(f"Line number must be between 1 and {max_length}, got {int(_line_number)}", ignore_quiet=True)
+                error(
+                    f"Line number must be between 1 and {max_length}, got {int(_line_number)}",
+                    ignore_quiet=True,
+                )
                 exit(1)
             else:
                 return _line_number
@@ -152,7 +155,12 @@ def input_prompt(message: Any, mode: str = None, max_length: int = 0) -> str:
 _last_progress = None
 _has_started = False
 _previous_messages = []
+_token_stats = False
 _last_chunk_size = 0
+_prompt_token_count = 0
+_thoughts_token_count = 0
+_output_token_count = 0
+_total_token_count = 0
 
 
 def progress_bar(
@@ -168,6 +176,11 @@ def progress_bar(
     isSending: bool = False,
     isThinking: bool = False,
     isTranscribing: bool = False,
+    token_stats: bool | None = None,
+    prompt_tokens: int | None = None,
+    thoughts_tokens: int | None = None,
+    output_tokens: int | None = None,
+    total_tokens: int | None = None,
     chunk_size: int = 0,
 ) -> None:
     """
@@ -182,7 +195,7 @@ def progress_bar(
         message: Optional message to display below the progress bar
         message_color: Color to use for the message
     """
-    global _last_progress, _has_started, _previous_messages, _loading_bars_index, _last_chunk_size
+    global _last_progress, _has_started, _previous_messages, _loading_bars_index, _last_chunk_size, _prompt_token_count, _thoughts_token_count, _output_token_count, _total_token_count, _token_stats
 
     # Save the current state for message updates
     _last_progress = {
@@ -193,7 +206,18 @@ def progress_bar(
         "suffix": suffix,
     }
 
+    if token_stats is not None:
+        _token_stats = token_stats
+
     _last_chunk_size = chunk_size
+    if prompt_tokens is not None:
+        _prompt_token_count += prompt_tokens
+    if thoughts_tokens is not None:
+        _thoughts_token_count += thoughts_tokens
+    if output_tokens is not None:
+        _output_token_count += output_tokens
+    if total_tokens is not None:
+        _total_token_count += total_tokens
 
     # Get terminal width
     terminal_width = shutil.get_terminal_size().columns
@@ -221,7 +245,10 @@ def progress_bar(
 
     # Calculate how many lines we need to clear based on previous messages and terminal width
     # Start with at least 2 lines (progress bar + empty line)
-    lines_to_clear = 2
+    if _token_stats:
+        lines_to_clear = 3
+    else:
+        lines_to_clear = 2
 
     # Get the command used to start the script
     command_line = " ".join([sys.executable] + sys.argv)
@@ -268,6 +295,15 @@ def progress_bar(
 
     if not _quiet_mode:
         sys.stdout.write(progress_text)
+        if _token_stats:
+            if _use_colors and Color.supports_color():
+                sys.stdout.write(
+                    f"\nPrompt Tokens: {Color.BLUE.value}{_prompt_token_count}{Color.RESET.value} | Thoughts Tokens: {Color.BLUE.value}{_thoughts_token_count}{Color.RESET.value} | Output Tokens: {Color.BLUE.value}{_output_token_count}{Color.RESET.value} | Total Tokens: {Color.BLUE.value}{_total_token_count}{Color.RESET.value}"
+                )
+            else:
+                sys.stdout.write(
+                    f"\nPrompt Tokens: {_prompt_token_count} | Thoughts Tokens: {_thoughts_token_count} | Output Tokens: {_output_token_count} | Total Tokens: {_total_token_count}"
+                )
         sys.stdout.write("\n\n")
 
     if len(_previous_messages) > 0 and "waiting" in _previous_messages[-1]["message"].lower():
@@ -324,10 +360,14 @@ def info_with_progress(
 
 
 def warning_with_progress(
-    message: Any, chunk_size: int = 0, isSending: bool = False, isTranscribing: bool = False
+    message: Any,
+    chunk_size: int = 0,
+    isSending: bool = False,
+    isTranscribing: bool = False,
+    ignore_quiet: bool = False,
 ) -> None:
     """Update the progress bar with a warning message"""
-    if _quiet_mode:
+    if _quiet_mode and not ignore_quiet:
         return
     progress_bar(
         **_last_progress,
@@ -392,11 +432,24 @@ def input_prompt_with_progress(message: Any, batch_size: int, isTranscribing: bo
     if _quiet_mode:
         return f"{max(1, batch_size - 50)}"
     return progress_bar(
-        **_last_progress, message=message, message_color=Color.WHITE, isPrompt=True, isTranscribing=isTranscribing
+        **_last_progress,
+        message=message,
+        message_color=Color.WHITE,
+        isPrompt=True,
+        isTranscribing=isTranscribing,
     )
 
 
-def update_loading_animation(chunk_size: int = 0, isThinking: bool = False, isTranscribing: bool = False) -> None:
+def update_loading_animation(
+    chunk_size: int = 0,
+    isThinking: bool = False,
+    isTranscribing: bool = False,
+    token_stats: bool = False,
+    prompt_tokens: int | None = None,
+    thoughts_tokens: int | None = None,
+    output_tokens: int | None = None,
+    total_tokens: int | None = None,
+) -> None:
     """Update the loading animation in the progress bar"""
     global _loading_bars_index
     if _quiet_mode:
@@ -410,6 +463,11 @@ def update_loading_animation(chunk_size: int = 0, isThinking: bool = False, isTr
         isThinking=isThinking,
         isTranscribing=isTranscribing,
         chunk_size=chunk_size,
+        token_stats=token_stats,
+        prompt_tokens=prompt_tokens,
+        thoughts_tokens=thoughts_tokens,
+        output_tokens=output_tokens,
+        total_tokens=total_tokens,
     )
 
 
