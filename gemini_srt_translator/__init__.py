@@ -67,13 +67,6 @@ thoughts_log: bool = None
 quiet: bool = None
 resume: bool = None
 
-if not skip_upgrade:
-    try:
-        upgrade_package("gemini-srt-translator", use_colors=use_colors)
-        raise Exception("Upgrade completed.")
-    except Exception:
-        pass
-
 
 def getmodels():
     """
@@ -95,6 +88,13 @@ def getmodels():
     Raises:
         Exception: If the Gemini API key is not provided.
     """
+
+    if not skip_upgrade:
+        try:
+            upgrade_package("gemini-srt-translator", use_colors=use_colors)
+        except Exception:
+            exit(0)
+
     translator = GeminiSRTTranslator(gemini_api_key=gemini_api_key)
     return translator.getmodels()
 
@@ -118,6 +118,13 @@ def listmodels():
     Raises:
         Exception: If the Gemini API key is not provided.
     """
+
+    if not skip_upgrade:
+        try:
+            upgrade_package("gemini-srt-translator", use_colors=use_colors)
+        except Exception:
+            exit(0)
+
     translator = GeminiSRTTranslator(gemini_api_key=gemini_api_key)
     models = translator.getmodels()
     if models:
@@ -237,6 +244,13 @@ def translate():
         Exception: If the target language is not provided.
         Exception: If the subtitle file is not provided.
     """
+
+    if not skip_upgrade:
+        try:
+            upgrade_package("gemini-srt-translator", use_colors=use_colors)
+        except Exception:
+            exit(0)
+
     params = {
         "gemini_api_key": gemini_api_key,
         "gemini_api_key2": gemini_api_key2,
@@ -308,6 +322,12 @@ def extract(type: Literal["audio", "srt"]):
         ValueError: If the type is not "audio" or "srt".
     """
 
+    if not skip_upgrade:
+        try:
+            upgrade_package("gemini-srt-translator", use_colors=use_colors)
+        except Exception:
+            exit(0)
+
     params = {
         "video_file": video_file,
         "isolate_voice": isolate_voice,
@@ -355,6 +375,12 @@ def transcribe():
         Exception: If the Gemini API key is not provided.
         Exception: If the audio file is not provided.
     """
+
+    if not skip_upgrade:
+        try:
+            upgrade_package("gemini-srt-translator", use_colors=use_colors)
+        except Exception:
+            exit(0)
 
     params = {
         "gemini_api_key": gemini_api_key,
