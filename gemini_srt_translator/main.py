@@ -169,29 +169,6 @@ class GeminiSRTTranslator:
 
         set_color_mode(use_colors)
 
-    def _accumulate_usage(self, usage_metadata):
-        """Accumulate token usage from a response's usage_metadata."""
-        if usage_metadata:
-            self.total_prompt_tokens += usage_metadata.prompt_token_count or 0
-            self.total_candidates_tokens += usage_metadata.candidates_token_count or 0
-            self.total_thoughts_tokens += getattr(usage_metadata, "thoughts_token_count", 0) or 0
-            self.total_tokens += usage_metadata.total_token_count or 0
-
-    def _log_token_usage(self, is_transcribing=False):
-        """Log accumulated token usage summary."""
-        if self.total_tokens > 0:
-            msg = f"Tokens used — prompt: {self.total_prompt_tokens:,}, completion: {self.total_candidates_tokens:,}, total: {self.total_tokens:,}"
-            if self.total_thoughts_tokens > 0:
-                msg += f" (thinking: {self.total_thoughts_tokens:,})"
-            info_with_progress(msg, isTranscribing=is_transcribing)
-
-    def _reset_token_usage(self):
-        """Reset token usage counters."""
-        self.total_prompt_tokens = 0
-        self.total_candidates_tokens = 0
-        self.total_thoughts_tokens = 0
-        self.total_tokens = 0
-
     def _get_translate_config(self):
         """Get the configuration for the translation model."""
         thinking_compatible = True
@@ -462,7 +439,6 @@ class GeminiSRTTranslator:
         Main translation method. Reads the input subtitle file, translates it in batches,
         and writes the translated subtitles to the output file.
         """
-        self._reset_token_usage()
 
         if not self.ffmpeg_installed and self.video_file:
             error(
@@ -904,7 +880,6 @@ class GeminiSRTTranslator:
                 success_with_progress("\n\033[96m✅ \033[96mTranslation completed successfully!")
             else:
                 success_with_progress("\n✅ Translation completed successfully!")
-            self._log_token_usage()
             if self.progress_log:
                 save_logs_to_file(self.log_file_path)
             translated_file.write(srt.compose(translated_subtitle, reindex=False, strict=False))
@@ -1046,8 +1021,7 @@ class GeminiSRTTranslator:
                     else:
                         info_with_progress(f"Batch {self.batch_number}.{retry} thinking process saved to file.")
                     save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
-                self._accumulate_usage(response.usage_metadata)
-                self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text)
+                self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text, stream_stable=True)
                 if not isinstance(self.translated_batch, list) or not all(
                     isinstance(item, dict) for item in self.translated_batch
                 ):
@@ -1095,11 +1069,13 @@ class GeminiSRTTranslator:
                                             )
                                         save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
                                 response_text += part.text
-                                self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text)
-                    if not isinstance(self.translated_batch, list) or not all(
-                        isinstance(item, dict) for item in self.translated_batch
-                    ):
-                        self.translated_batch = self._flatten_repaired_json(self.translated_batch)
+                                self.translated_batch: list[SubtitleObject] = json_repair.loads(
+                                    response_text, stream_stable=True
+                                )
+                                if not isinstance(self.translated_batch, list) or not all(
+                                    isinstance(item, dict) for item in self.translated_batch
+                                ):
+                                    self.translated_batch = self._flatten_repaired_json(self.translated_batch)
                     chunk_size = len(self.translated_batch)
                     if chunk_size > 0:
                         self._process_translated_lines(
@@ -1185,28 +1161,6 @@ class GeminiSRTTranslator:
         ]
         batch.clear()
         return previous_content if self.preserve_context else []
-
-    @staticmethod
-    def _flatten_repaired_json(data) -> list:
-        """
-        Flatten nested structures produced by json_repair when partial JSON
-        contains \\n-[ patterns (newline + bracket in subtitle text).
-
-        json_repair can misinterpret these as array boundaries, producing
-        nested lists like [[{...}, {...}], ["text"]] instead of [{...}, {...}].
-        This extracts all valid dict items from the nested structure.
-        """
-        result = []
-        if not isinstance(data, list):
-            return result
-        for item in data:
-            if isinstance(item, dict):
-                result.append(item)
-            elif isinstance(item, list):
-                for sub in item:
-                    if isinstance(sub, dict):
-                        result.append(sub)
-        return result
 
     @staticmethod
     def _flatten_repaired_json(data) -> list:
@@ -1322,7 +1276,6 @@ class GeminiSRTTranslator:
         """
         Transcribe audio file into subtitles.
         """
-        self._reset_token_usage()
         extracted = False
         if self.video_file and not self.audio_file:
             self.audio_file = extract_audio_from_video(self.video_file, isolate_voice=self.isolate_voice)
@@ -1566,7 +1519,13 @@ class GeminiSRTTranslator:
                                                             retry,
                                                         )
                                                 response_text += part.text
-                                                transcription_json = json_repair.loads(response_text)
+                                                transcription_json = json_repair.loads(
+                                                    response_text, stream_stable=True
+                                                )
+                                                if not isinstance(transcription_json, list) or not all(
+                                                    isinstance(item, dict) for item in transcription_json
+                                                ):
+                                                    transcription_json = self._flatten_repaired_json(transcription_json)
                                                 if len(transcription_json) > 1:
                                                     if "time_end" in transcription_json[-2]:
                                                         ts_for_anim = _normalize_timestamp(
@@ -1626,7 +1585,11 @@ class GeminiSRTTranslator:
                             if blocked:
                                 raise Exception("Content blocked by the API.")
 
-                            transcription_json = json_repair.loads(response_text)
+                            transcription_json = json_repair.loads(response_text, stream_stable=True)
+                            if not isinstance(transcription_json, list) or not all(
+                                isinstance(item, dict) for item in transcription_json
+                            ):
+                                transcription_json = self._flatten_repaired_json(transcription_json)
 
                             for i in range(len(transcription_json)):
                                 start_ts = _normalize_timestamp(transcription_json[i]["time_start"])
@@ -1714,7 +1677,6 @@ class GeminiSRTTranslator:
                 )
             else:
                 success_with_progress(f"\nTranscription saved to {self.output_file}", isTranscribing=True)
-            self._log_token_usage(is_transcribing=True)
 
             if os.path.exists(self.progress_file):
                 os.remove(self.progress_file)
