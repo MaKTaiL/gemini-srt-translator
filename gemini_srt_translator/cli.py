@@ -110,6 +110,10 @@ def cmd_translate(args) -> None:
         gst.thinking_budget = args.thinking_budget
     if args.thinking_level:
         gst.thinking_level = args.thinking_level
+    if args.token_stats:
+        gst.token_stats = args.token_stats
+    if args.no_context:
+        gst.preserve_context = not args.no_context
 
     # Set boolean flags
     if args.no_voice_isolation:
@@ -196,6 +200,10 @@ def cmd_transcribe(args) -> None:
         gst.audio_chunk_size = args.audio_chunk_size
     if args.thinking_budget:
         gst.thinking_budget = args.thinking_budget
+    if args.thinking_level:
+        gst.thinking_level = args.thinking_level
+    if args.token_stats:
+        gst.token_stats = args.token_stats
     if args.temperature:
         gst.temperature = args.temperature
     if args.top_p:
@@ -294,6 +302,8 @@ Examples:
     translate_parser.add_argument("--top-k", type=int, help="Top K (>=0)")
     translate_parser.add_argument("--thinking-budget", type=int, help="Thinking budget (0-32768)")
     translate_parser.add_argument("--thinking-level", type=str, help="Thinking level (minimal, low, medium, high)")
+    translate_parser.add_argument("--token-stats", action="store_true", default=None, help="Show token usage")
+    translate_parser.add_argument("--no-context", action="store_true", default=None, help="No context between batches")
     translate_parser.add_argument("--no-streaming", action="store_true", default=None, help="Disable streaming")
     translate_parser.add_argument("--no-thinking", action="store_true", default=None, help="Disable thinking mode")
     translate_parser.add_argument("--skip-upgrade", action="store_true", default=None, help="Skip upgrade check")
@@ -339,6 +349,7 @@ Examples:
     transcribe_parser.add_argument("--audio-chunk-size", type=int, help="Audio chunk size for processing in seconds")
     transcribe_parser.add_argument("--thinking-budget", type=int, help="Thinking budget (0-32768)")
     transcribe_parser.add_argument("--thinking-level", type=str, help="Thinking level (minimal, low, medium, high)")
+    transcribe_parser.add_argument("--token-stats", action="store_true", default=None, help="Show token usage")
     transcribe_parser.add_argument("--temperature", type=float, help="Temperature (0.0-2.0)")
     transcribe_parser.add_argument("--top-p", type=float, help="Top P (0.0-1.0)")
     transcribe_parser.add_argument("--top-k", type=int, help="Top K (>=0)")

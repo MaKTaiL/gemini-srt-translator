@@ -20,7 +20,7 @@
 - 🎙️ **Transcription**: Transcribe audio or video files directly into SRT subtitles using Gemini's audio capabilities.
 - ⏱️ **Timing & Format**: Ensures that the translated subtitles maintain the exact timestamps and basic SRT formatting of the original file.
 - 💾 **Quick Resume**: Easily resume interrupted translations from where you left off.
-- 🧠 **Advanced AI**: Leverages thinking and reasoning capabilities for more contextually accurate translations (available on Gemini 2.5 models).
+- 🧠 **Advanced AI**: Leverages thinking and reasoning capabilities for more contextually accurate translations (available on Gemini 2.5 and 3 models).
 - 🖥️ **CLI Support**: Full command-line interface for easy automation and scripting.
 - ⚙️ **Customizable**: Tune model parameters, adjust batch size, and access other advanced settings.
 - 🎞️ **SRT Extraction**: Extract and translate SRT subtitles from video files automatically (requires [FFmpeg](https://ffmpeg.org/)).
@@ -95,22 +95,22 @@ You can provide your API key in several ways:
 
 2. **Command Line Argument**: Use the `-k` or `--api-key` flag
 
-   ```bash
-   gst translate -i subtitle.srt -l French -k YOUR_API_KEY
-   ```
+```bash
+gst translate -i subtitle.srt -l French -k YOUR_API_KEY
+```
 
 3. **Interactive Prompt**: The tool will prompt you if no key is found
 
-   ```bash
-   gst translate -i subtitle.srt -l French
-   ```
+```bash
+gst translate -i subtitle.srt -l French
+```
 
 4. **Python API**: Set the `gemini_api_key` variable in your script
 
-   ```python
-   import gemini_srt_translator as gst
-   gst.gemini_api_key = "your_api_key_here"
-   ```
+```python
+import gemini_srt_translator as gst
+gst.gemini_api_key = "your_api_key_here"
+```
 
 ---
 
@@ -158,13 +158,15 @@ gst translate \
   -k YOUR_API_KEY \
   -k2 YOUR_SECOND_API_KEY \
   -o output_french.srt \
-  --model gemini-2.5-flash \
+  --model gemini-3.5-flash \
   --batch-size 150 \
   --temperature 0.7 \
   --description "Medical TV series, use medical terminology" \
   --progress-log \
   --thoughts-log \
   --extract-audio \
+  --token-stats \
+  --no-context
 ```
 
 #### Transcribing Audio/Video
@@ -180,8 +182,10 @@ gst transcribe -a audio.mp3 -o transcription.srt
 gst transcribe \
   -v video.mp4 \
   -o transcription.srt \
-  --model gemini-2.5-flash \
+  --model gemini-3.5-flash \
   --description "Meeting recording about project X" \
+  --thinking-level high \
+  --token-stats
 ```
 
 #### Extracting Audio/Subtitles
@@ -249,7 +253,8 @@ import gemini_srt_translator as gst
 gst.gemini_api_key = "your_api_key"
 gst.video_file = "video.mp4" # Or gst.audio_file = "audio.mp3"
 gst.output_file = "transcription.srt"
-gst.model_name = "gemini-2.5-flash"
+gst.model_name = "gemini-3.5-flash"
+gst.token_stats = True
 
 gst.transcribe()
 ```
@@ -287,18 +292,20 @@ gst.extract("audio")
 - `output_file`: Name of the translated file.
 - `start_line`: Starting line for translation.
 - `description`: Description of the translation job.
-- `batch_size`: Batch size (default: 300).
+- `batch_size`: Batch size (default: 1000).
 - `free_quota`: Signal GST that you are using a free quota (default: True).
 - `skip_upgrade`: Skip version upgrade check (default: False).
 - `use_colors`: Activate colors in terminal (default: True).
 - `progress_log`: Enable progress logging to a file (default: False).
 - `thoughts_log`: Enable logging of the 'thinking' process to a file (default: False).
-- `quiet_mode`: Suppress all output (default: False).
+- `quiet`: Suppress all output (default: False).
 - `resume`: Skip prompt and set automatic resume mode.
+- `token_stats`: Show token usage information (default: False).
+- `preserve_context`: Preserve context between batches (default: True).
 
 #### 🔬 Model Tuning Parameters
 
-- `model_name`: Gemini model (default: "gemini-2.5-flash-preview-05-20").
+- `model_name`: Gemini model (default: "gemini-3.5-flash").
 - `temperature`: Controls randomness in output. Lower for more deterministic, higher for more creative (range: 0.0-2.0).
 - `top_p`: Nucleus sampling parameter (range: 0.0-1.0).
 - `top_k`: Top-k sampling parameter (range: >=0).
@@ -326,7 +333,7 @@ gst.audio_file = "audio.mp3"
 gst.extract_audio = False
 gst.start_line = 20
 gst.description = "Medical TV series, use medical terms"
-gst.model_name = "gemini-2.5-pro-preview-03-25"
+gst.model_name = "gemini-3.5-flash"
 gst.batch_size = 150
 gst.streaming = True
 gst.thinking = True
@@ -340,8 +347,10 @@ gst.skip_upgrade = True
 gst.use_colors = False
 gst.progress_log = True
 gst.thoughts_log = True
-gst.quiet_mode = False
+gst.quiet = False
 gst.resume = True
+gst.token_stats = True
+gst.preserve_context = True
 
 gst.translate()
 ```

@@ -54,6 +54,8 @@ streaming: bool = None
 thinking: bool = None
 thinking_budget: int = None
 thinking_level: Literal["minimal", "low", "medium", "high"] = None
+token_stats: bool = None
+preserve_context: bool = None
 temperature: float = None
 top_p: float = None
 top_k: int = None
@@ -64,13 +66,6 @@ progress_log: bool = None
 thoughts_log: bool = None
 quiet: bool = None
 resume: bool = None
-
-if not skip_upgrade:
-    try:
-        upgrade_package("gemini-srt-translator", use_colors=use_colors)
-        raise Exception("Upgrade completed.")
-    except Exception:
-        pass
 
 
 def getmodels():
@@ -93,6 +88,13 @@ def getmodels():
     Raises:
         Exception: If the Gemini API key is not provided.
     """
+
+    if not skip_upgrade:
+        try:
+            upgrade_package("gemini-srt-translator", use_colors=use_colors)
+        except Exception:
+            exit(0)
+
     translator = GeminiSRTTranslator(gemini_api_key=gemini_api_key)
     return translator.getmodels()
 
@@ -116,6 +118,13 @@ def listmodels():
     Raises:
         Exception: If the Gemini API key is not provided.
     """
+
+    if not skip_upgrade:
+        try:
+            upgrade_package("gemini-srt-translator", use_colors=use_colors)
+        except Exception:
+            exit(0)
+
     translator = GeminiSRTTranslator(gemini_api_key=gemini_api_key)
     models = translator.getmodels()
     if models:
@@ -173,11 +182,11 @@ def translate():
     # (Optional) Additional description of the translation task
     gst.description = "This subtitle is from a TV Series called 'Friends'."
 
-    # (Optional) Model name to use for translation (default: "gemini-2.5-flash")
-    gst.model_name = "gemini-2.5-flash"
+    # (Optional) Model name to use for translation (default: "gemini-3.5-flash")
+    gst.model_name = "gemini-3.5-flash"
 
-    # (Optional) Batch size for translation (default: 300)
-    gst.batch_size = 300
+    # (Optional) Batch size for translation (default: 1000)
+    gst.batch_size = 1000
 
     # (Optional) Whether to use streamed responses (default: True)
     gst.streaming = True
@@ -187,6 +196,15 @@ def translate():
 
     # (Optional) Thinking budget for translation (default: 2048, range: 0-24576, 0 disables thinking)
     gst.thinking_budget = 2048
+
+    # (Optional) Thinking level for translation (default: "medium", range: "minimal", "low", "medium", "high")
+    gst.thinking_level = "medium"
+
+    # (Optional) Show token usage information (default: False)
+    gst.token_stats = False
+
+    # (Optional) Preserve context between batches (default: True)
+    gst.preserve_context = True
 
     # (Optional) Temperature for the translation model (range: 0.0-2.0)
     gst.temperature = 0.5
@@ -212,6 +230,7 @@ def translate():
     # (Optional) Enable thoughts logging (default: False)
     gst.thoughts_log = False
 
+
     # (Optional) Enable quiet mode (default: False)
     gst.quiet = False
 
@@ -225,6 +244,13 @@ def translate():
         Exception: If the target language is not provided.
         Exception: If the subtitle file is not provided.
     """
+
+    if not skip_upgrade:
+        try:
+            upgrade_package("gemini-srt-translator", use_colors=use_colors)
+        except Exception:
+            exit(0)
+
     params = {
         "gemini_api_key": gemini_api_key,
         "gemini_api_key2": gemini_api_key2,
@@ -244,6 +270,8 @@ def translate():
         "thinking": thinking,
         "thinking_budget": thinking_budget,
         "thinking_level": thinking_level,
+        "token_stats": token_stats,
+        "preserve_context": preserve_context,
         "temperature": temperature,
         "top_p": top_p,
         "top_k": top_k,
@@ -294,6 +322,12 @@ def extract(type: Literal["audio", "srt"]):
         ValueError: If the type is not "audio" or "srt".
     """
 
+    if not skip_upgrade:
+        try:
+            upgrade_package("gemini-srt-translator", use_colors=use_colors)
+        except Exception:
+            exit(0)
+
     params = {
         "video_file": video_file,
         "isolate_voice": isolate_voice,
@@ -342,6 +376,12 @@ def transcribe():
         Exception: If the audio file is not provided.
     """
 
+    if not skip_upgrade:
+        try:
+            upgrade_package("gemini-srt-translator", use_colors=use_colors)
+        except Exception:
+            exit(0)
+
     params = {
         "gemini_api_key": gemini_api_key,
         "gemini_api_key2": gemini_api_key2,
@@ -356,6 +396,7 @@ def transcribe():
         "thinking": thinking,
         "thinking_budget": thinking_budget,
         "thinking_level": thinking_level,
+        "token_stats": token_stats,
         "temperature": temperature,
         "top_p": top_p,
         "top_k": top_k,
