@@ -159,6 +159,7 @@ gst translate \
   -k2 YOUR_SECOND_API_KEY \
   -o output_french.srt \
   --model gemini-3.5-flash \
+  --service-tier standard \
   --batch-size 150 \
   --temperature 0.7 \
   --description "Medical TV series, use medical terminology" \
@@ -183,6 +184,7 @@ gst transcribe \
   -v video.mp4 \
   -o transcription.srt \
   --model gemini-3.5-flash \
+  --service-tier standard \
   --description "Meeting recording about project X" \
   --thinking-level high \
   --token-stats
@@ -317,6 +319,8 @@ gst.extract("audio")
   - Only available for Gemini 2.5 models.
 - `thinking_level`: Controls the depth of thinking process (options: minimal, low, medium, high).
   - Only available for Gemini 3 models.
+- `service_tier`: Service tier for Gemini API (options: `standard`, `flex`, `priority`).
+  - Only available on paid plans.
 
 #### 💡 Full example:
 
@@ -351,6 +355,7 @@ gst.quiet = False
 gst.resume = True
 gst.token_stats = True
 gst.preserve_context = True
+gst.service_tier = "standard"
 
 gst.translate()
 ```
