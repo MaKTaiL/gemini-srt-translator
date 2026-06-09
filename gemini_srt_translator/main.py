@@ -88,6 +88,7 @@ class GeminiSRTTranslator:
         thinking: bool = True,
         thinking_budget: int = None,
         thinking_level: str = None,
+        service_tier: str = None,
         token_stats: bool = False,
         preserve_context: bool = True,
         temperature: float = None,
@@ -142,6 +143,7 @@ class GeminiSRTTranslator:
         self.thinking = thinking
         self.thinking_budget = thinking_budget
         self.thinking_level = thinking_level
+        self.service_tier = service_tier
         self.token_stats = token_stats
         self.preserve_context = preserve_context
         self.temperature = temperature
@@ -221,6 +223,7 @@ class GeminiSRTTranslator:
                 audio_file=self.audio_file,
                 description=self.description,
             ),
+            service_tier=self.service_tier,
             thinking_config=(
                 types.ThinkingConfig(
                     include_thoughts=self.thinking,
@@ -279,6 +282,7 @@ class GeminiSRTTranslator:
                 thinking_compatible=thinking_compatible,
                 description=self.description,
             ),
+            service_tier=self.service_tier,
             thinking_config=(
                 types.ThinkingConfig(
                     include_thoughts=self.thinking,
@@ -486,6 +490,10 @@ class GeminiSRTTranslator:
 
         elif not self.input_file:
             error("Please provide a subtitle or video file.", ignore_quiet=True)
+            exit(1)
+
+        if self.service_tier not in ["standard", "flex", "priority"]:
+            error("Service tier must be 'standard', 'flex' or 'priority'.", ignore_quiet=True)
             exit(1)
 
         if self.thinking_budget is not None:
@@ -1307,6 +1315,10 @@ class GeminiSRTTranslator:
                 f"Model {self.model_name} is not available for transcription. Please use a Gemini 2.5 or 3.0 model.",
                 ignore_quiet=True,
             )
+            exit(1)
+
+        if self.service_tier not in ["standard", "flex", "priority"]:
+            error("Service tier must be 'standard', 'flex' or 'priority'.", ignore_quiet=True)
             exit(1)
 
         if self.thinking_budget is not None:

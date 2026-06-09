@@ -54,6 +54,7 @@ streaming: bool = None
 thinking: bool = None
 thinking_budget: int = None
 thinking_level: Literal["minimal", "low", "medium", "high"] = None
+service_tier: Literal["standard", "flex", "priority"] = None
 token_stats: bool = None
 preserve_context: bool = None
 temperature: float = None
@@ -200,6 +201,9 @@ def translate():
     # (Optional) Thinking level for translation (default: "medium", range: "minimal", "low", "medium", "high")
     gst.thinking_level = "medium"
 
+    # (Optional) Service tier for translation (only available on paid plans, range: "standard", "flex", "priority")
+    gst.service_tier = "standard"
+
     # (Optional) Show token usage information (default: False)
     gst.token_stats = False
 
@@ -270,6 +274,7 @@ def translate():
         "thinking": thinking,
         "thinking_budget": thinking_budget,
         "thinking_level": thinking_level,
+        "service_tier": service_tier,
         "token_stats": token_stats,
         "preserve_context": preserve_context,
         "temperature": temperature,
@@ -396,6 +401,7 @@ def transcribe():
         "thinking": thinking,
         "thinking_budget": thinking_budget,
         "thinking_level": thinking_level,
+        "service_tier": service_tier,
         "token_stats": token_stats,
         "temperature": temperature,
         "top_p": top_p,
