@@ -1021,7 +1021,7 @@ class GeminiSRTTranslator:
                     else:
                         info_with_progress(f"Batch {self.batch_number}.{retry} thinking process saved to file.")
                     save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
-                self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text, stream_stable=True)
+                self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text)
                 if not isinstance(self.translated_batch, list) or not all(
                     isinstance(item, dict) for item in self.translated_batch
                 ):
@@ -1585,7 +1585,7 @@ class GeminiSRTTranslator:
                             if blocked:
                                 raise Exception("Content blocked by the API.")
 
-                            transcription_json = json_repair.loads(response_text, stream_stable=True)
+                            transcription_json = json_repair.loads(response_text)
                             if not isinstance(transcription_json, list) or not all(
                                 isinstance(item, dict) for item in transcription_json
                             ):
