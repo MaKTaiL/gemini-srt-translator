@@ -171,6 +171,7 @@ def progress_bar(
     suffix: str = "",
     message: str = "",
     message_color: Color = None,
+    isDone: bool = True,
     isPrompt: bool = False,
     isLoading: bool = False,
     isSending: bool = False,
@@ -209,7 +210,7 @@ def progress_bar(
     if token_stats is not None:
         _token_stats = token_stats
 
-    if chunk_size != 0:
+    if chunk_size > _last_chunk_size or isDone:
         _last_chunk_size = chunk_size
     if prompt_tokens is not None:
         _prompt_token_count += prompt_tokens
@@ -460,6 +461,7 @@ def update_loading_animation(
         **_last_progress,
         message="",
         message_color=None,
+        isDone=False,
         isLoading=not isThinking,
         isThinking=isThinking,
         isTranscribing=isTranscribing,
