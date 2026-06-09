@@ -1022,6 +1022,10 @@ class GeminiSRTTranslator:
                         info_with_progress(f"Batch {self.batch_number}.{retry} thinking process saved to file.")
                     save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
                 self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text)
+                if not isinstance(self.translated_batch, list) or not all(
+                    isinstance(item, dict) for item in self.translated_batch
+                ):
+                    self.translated_batch = self._flatten_repaired_json(self.translated_batch)
                 chunk_size = len(self.translated_batch)
                 update_loading_animation(
                     chunk_size=chunk_size,
@@ -1065,7 +1069,13 @@ class GeminiSRTTranslator:
                                             )
                                         save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
                                 response_text += part.text
-                                self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text)
+                                self.translated_batch: list[SubtitleObject] = json_repair.loads(
+                                    response_text, stream_stable=True
+                                )
+                                if not isinstance(self.translated_batch, list) or not all(
+                                    isinstance(item, dict) for item in self.translated_batch
+                                ):
+                                    self.translated_batch = self._flatten_repaired_json(self.translated_batch)
                     chunk_size = len(self.translated_batch)
                     if chunk_size > 0:
                         self._process_translated_lines(
@@ -1151,6 +1161,28 @@ class GeminiSRTTranslator:
         ]
         batch.clear()
         return previous_content if self.preserve_context else []
+
+    @staticmethod
+    def _flatten_repaired_json(data) -> list:
+        """
+        Flatten nested structures produced by json_repair when partial JSON
+        contains \\n-[ patterns (newline + bracket in subtitle text).
+
+        json_repair can misinterpret these as array boundaries, producing
+        nested lists like [[{...}, {...}], ["text"]] instead of [{...}, {...}].
+        This extracts all valid dict items from the nested structure.
+        """
+        result = []
+        if not isinstance(data, list):
+            return result
+        for item in data:
+            if isinstance(item, dict):
+                result.append(item)
+            elif isinstance(item, list):
+                for sub in item:
+                    if isinstance(sub, dict):
+                        result.append(sub)
+        return result
 
     def _process_translated_lines(
         self,
@@ -1487,7 +1519,13 @@ class GeminiSRTTranslator:
                                                             retry,
                                                         )
                                                 response_text += part.text
-                                                transcription_json = json_repair.loads(response_text)
+                                                transcription_json = json_repair.loads(
+                                                    response_text, stream_stable=True
+                                                )
+                                                if not isinstance(transcription_json, list) or not all(
+                                                    isinstance(item, dict) for item in transcription_json
+                                                ):
+                                                    transcription_json = self._flatten_repaired_json(transcription_json)
                                                 if len(transcription_json) > 1:
                                                     if "time_end" in transcription_json[-2]:
                                                         ts_for_anim = _normalize_timestamp(
@@ -1548,6 +1586,10 @@ class GeminiSRTTranslator:
                                 raise Exception("Content blocked by the API.")
 
                             transcription_json = json_repair.loads(response_text)
+                            if not isinstance(transcription_json, list) or not all(
+                                isinstance(item, dict) for item in transcription_json
+                            ):
+                                transcription_json = self._flatten_repaired_json(transcription_json)
 
                             for i in range(len(transcription_json)):
                                 start_ts = _normalize_timestamp(transcription_json[i]["time_start"])

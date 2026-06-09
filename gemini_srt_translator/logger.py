@@ -171,6 +171,7 @@ def progress_bar(
     suffix: str = "",
     message: str = "",
     message_color: Color = None,
+    isDone: bool = True,
     isPrompt: bool = False,
     isLoading: bool = False,
     isSending: bool = False,
@@ -209,7 +210,8 @@ def progress_bar(
     if token_stats is not None:
         _token_stats = token_stats
 
-    _last_chunk_size = chunk_size
+    if chunk_size > _last_chunk_size or isDone:
+        _last_chunk_size = chunk_size
     if prompt_tokens is not None:
         _prompt_token_count += prompt_tokens
     if thoughts_tokens is not None:
@@ -223,14 +225,14 @@ def progress_bar(
     terminal_width = shutil.get_terminal_size().columns
 
     # Create the progress bar
-    progress_ratio = (current + chunk_size) / total if total > 0 else 0
+    progress_ratio = (current + _last_chunk_size) / total if total > 0 else 0
     filled_length = int(bar_length * progress_ratio)
     bar = "█" * filled_length + "░" * (bar_length - filled_length)
     percentage = int(100 * progress_ratio)
     if not isTranscribing:
-        progress_text = f"{prefix} |{bar}| {percentage}% ({current + chunk_size}/{total})"
+        progress_text = f"{prefix} |{bar}| {percentage}% ({current + _last_chunk_size}/{total})"
     else:
-        current_text = srt.timedelta_to_srt_timestamp(timedelta(seconds=current + chunk_size))
+        current_text = srt.timedelta_to_srt_timestamp(timedelta(seconds=current + _last_chunk_size))
         total_text = srt.timedelta_to_srt_timestamp(timedelta(seconds=total))
         progress_text = f"{prefix} |{bar}| {percentage}% ({current_text}/{total_text})"
     # Format the progress bar line
@@ -459,6 +461,7 @@ def update_loading_animation(
         **_last_progress,
         message="",
         message_color=None,
+        isDone=False,
         isLoading=not isThinking,
         isThinking=isThinking,
         isTranscribing=isTranscribing,
