@@ -38,6 +38,11 @@ from .utils import upgrade_package
 
 gemini_api_key: str = os.getenv("GEMINI_API_KEY", None)
 gemini_api_key2: str = os.getenv("GEMINI_API_KEY2", None)
+cloud_api_key: str = os.getenv("GOOGLE_API_KEY", None)
+cloud_project: str = os.getenv("GOOGLE_CLOUD_PROJECT", None)
+cloud_location: str = os.getenv("GOOGLE_CLOUD_LOCATION", None)
+use_enterprise: bool = os.getenv("GOOGLE_GENAI_USE_ENTERPRISE", False)
+request_type: Literal["shared", "dedicated"] = None
 target_language: str = None
 input_file: str = None
 output_file: str = None
@@ -126,7 +131,13 @@ def listmodels():
         except Exception:
             exit(0)
 
-    translator = GeminiSRTTranslator(gemini_api_key=gemini_api_key)
+    translator = GeminiSRTTranslator(
+        gemini_api_key=gemini_api_key,
+        use_enterprise=use_enterprise,
+        cloud_api_key=cloud_api_key,
+        cloud_project=cloud_project,
+        cloud_location=cloud_location,
+    )
     models = translator.getmodels()
     if models:
         print("Available models:\n")
@@ -147,8 +158,21 @@ def translate():
     ```
     import gemini_srt_translator as gst
 
-    # Your Gemini API key
+    # AI Studio API key:
     gst.gemini_api_key = "your_gemini_api_key_here"
+
+    # OR
+
+    # Agent Platform (former Vertex AI) using ADC:
+    gst.use_enterprise = True
+    gst.cloud_project = "your_cloud_project_here"
+    gst.cloud_location = "your_cloud_location_here"  # (default: "global")
+    gst.request_type = "shared"  # (optional)
+
+    # Agent Platform (former Vertex AI) using API Key (Express Mode):
+    gst.use_enterprise = True
+    gst.cloud_api_key = "your_google_api_key_here"
+    gst.request_type = "dedicated"  # (optional)
 
     # Target language for translation
     gst.target_language = "French"
@@ -258,6 +282,11 @@ def translate():
     params = {
         "gemini_api_key": gemini_api_key,
         "gemini_api_key2": gemini_api_key2,
+        "use_enterprise": use_enterprise,
+        "cloud_api_key": cloud_api_key,
+        "cloud_project": cloud_project,
+        "cloud_location": cloud_location,
+        "request_type": request_type,
         "target_language": target_language,
         "input_file": input_file,
         "output_file": output_file,
@@ -390,6 +419,11 @@ def transcribe():
     params = {
         "gemini_api_key": gemini_api_key,
         "gemini_api_key2": gemini_api_key2,
+        "use_enterprise": use_enterprise,
+        "cloud_api_key": cloud_api_key,
+        "cloud_project": cloud_project,
+        "cloud_location": cloud_location,
+        "request_type": request_type,
         "video_file": video_file,
         "audio_file": audio_file,
         "model_name": model_name,

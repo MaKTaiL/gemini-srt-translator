@@ -7,6 +7,7 @@ import typing
 import unicodedata as ud
 from collections import Counter
 from datetime import timedelta
+from typing import Literal
 
 import json_repair
 import srt
@@ -72,6 +73,11 @@ class GeminiSRTTranslator:
         self,
         gemini_api_key: str = None,
         gemini_api_key2: str = None,
+        use_enterprise: bool = False,
+        cloud_api_key: str = None,
+        cloud_project: str = None,
+        cloud_location: str = "global",
+        request_type: Literal["shared", "dedicated"] = None,
         target_language: str = None,
         input_file: str = None,
         output_file: str = None,
@@ -87,8 +93,8 @@ class GeminiSRTTranslator:
         streaming: bool = True,
         thinking: bool = True,
         thinking_budget: int = None,
-        thinking_level: str = None,
-        service_tier: str = None,
+        thinking_level: Literal["minimal", "low", "medium", "high"] = None,
+        service_tier: Literal["standard", "flex", "priority"] = None,
         token_stats: bool = False,
         preserve_context: bool = True,
         temperature: float = None,
@@ -117,7 +123,7 @@ class GeminiSRTTranslator:
         if output_file:
             self.output_file = output_file
         else:
-            if audio_file and not input_file and not video_file:  # Doar transcriere
+            if audio_file and not input_file and not video_file:
                 suffix = "_transcribed.srt"
             else:
                 suffix = "_translated.srt" if input_file else ".srt"
@@ -128,6 +134,11 @@ class GeminiSRTTranslator:
         self.gemini_api_key = gemini_api_key
         self.gemini_api_key2 = gemini_api_key2
         self.current_api_key = gemini_api_key
+        self.use_enterprise = use_enterprise
+        self.cloud_api_key = cloud_api_key
+        self.cloud_project = cloud_project
+        self.cloud_location = cloud_location
+        self.request_type = request_type
         self.target_language = target_language
         self.input_file = input_file
         self.video_file = video_file
@@ -223,7 +234,7 @@ class GeminiSRTTranslator:
                 audio_file=self.audio_file,
                 description=self.description,
             ),
-            service_tier=self.service_tier,
+            service_tier=self.service_tier if not self.use_enterprise else None,
             thinking_config=(
                 types.ThinkingConfig(
                     include_thoughts=self.thinking,
@@ -282,7 +293,7 @@ class GeminiSRTTranslator:
                 thinking_compatible=thinking_compatible,
                 description=self.description,
             ),
-            service_tier=self.service_tier,
+            service_tier=self.service_tier if not self.use_enterprise else None,
             thinking_config=(
                 types.ThinkingConfig(
                     include_thoughts=self.thinking,
@@ -425,17 +436,16 @@ class GeminiSRTTranslator:
 
     def getmodels(self):
         """Get available Gemini models that support content generation."""
-        if not self.current_api_key:
-            error("Please provide a valid Gemini API key.")
-            exit(1)
-
         client = self._get_client()
         models = client.models.list()
         list_models = []
         for model in models:
-            supported_actions = model.supported_actions
-            if "generateContent" in supported_actions:
-                list_models.append(model.name.replace("models/", ""))
+            if self.use_enterprise:
+                list_models.append(model.name.replace("publishers/google/models/", ""))
+            else:
+                supported_actions = model.supported_actions
+                if supported_actions and "generateContent" in supported_actions:
+                    list_models.append(model.name.replace("models/", ""))
         return list_models
 
     def translate(self):
@@ -476,10 +486,6 @@ class GeminiSRTTranslator:
                 exit(1)
             self.srt_extracted = True
 
-        if not self.current_api_key:
-            error("Please provide a valid Gemini API key.", ignore_quiet=True)
-            exit(1)
-
         if not self.target_language:
             error("Please provide a target language.", ignore_quiet=True)
             exit(1)
@@ -492,7 +498,7 @@ class GeminiSRTTranslator:
             error("Please provide a subtitle or video file.", ignore_quiet=True)
             exit(1)
 
-        if self.service_tier not in ["standard", "flex", "priority"]:
+        if self.service_tier and self.service_tier not in ["standard", "flex", "priority"]:
             error("Service tier must be 'standard', 'flex' or 'priority'.", ignore_quiet=True)
             exit(1)
 
@@ -540,16 +546,15 @@ class GeminiSRTTranslator:
 
         self._check_saved_progress()
 
-        models = self.getmodels()
-
-        if self.model_name not in models:
-            error(
-                f"Model {self.model_name} is not available. Please choose a different model.",
-                ignore_quiet=True,
-            )
-            exit(1)
-
-        self._get_token_limit()
+        if not self.cloud_api_key:
+            models = self.getmodels()
+            if self.model_name not in models:
+                error(
+                    f"Model {self.model_name} is not available. Please choose a different model.",
+                    ignore_quiet=True,
+                )
+                exit(1)
+            self._get_token_limit()
 
         with open(self.input_file, "r", encoding="utf-8") as original_file:
             original_text = original_file.read()
@@ -758,13 +763,16 @@ class GeminiSRTTranslator:
                             batch.pop()
                 try:
                     while not validated:
-                        info_with_progress(f"Validating token size...")
-                        try:
-                            validated = self._validate_token_size(json.dumps(batch, ensure_ascii=False))
-                        except Exception as e:
-                            error_with_progress(f"Error validating token size: {e}")
-                            info_with_progress(f"Retrying validation...")
-                            continue
+                        if not self.use_enterprise:
+                            info_with_progress(f"Validating token size...")
+                            try:
+                                validated = self._validate_token_size(json.dumps(batch, ensure_ascii=False))
+                            except Exception as e:
+                                error_with_progress(f"Error validating token size: {e}")
+                                info_with_progress(f"Retrying validation...")
+                                continue
+                        else:
+                            break
                         if not validated:
                             error_with_progress(
                                 f"Token size ({int(self.token_count/0.9)}) exceeds limit ({self.token_limit}) for {self.model_name}."
@@ -847,7 +855,7 @@ class GeminiSRTTranslator:
                         last_time = current_time
                         continue
 
-                    elif any(err in e_str for err in ["500", "503", "unavailable", "overloaded"]):
+                    elif any(err in e_str for err in ["429", "500", "503", "unavailable", "overloaded"]):
                         server_overload_retries += 1
                         if server_overload_retries <= max_overload_retries:
                             warning_with_progress(
@@ -885,9 +893,9 @@ class GeminiSRTTranslator:
                         continue
 
             if self.use_colors:
-                success_with_progress("\n\033[96m✅ \033[96mTranslation completed successfully!")
+                success_with_progress("\033[96m✅ \033[96mTranslation completed successfully!")
             else:
-                success_with_progress("\n✅ Translation completed successfully!")
+                success_with_progress("✅ Translation completed successfully!")
             if self.progress_log:
                 save_logs_to_file(self.log_file_path)
             translated_file.write(srt.compose(translated_subtitle, reindex=False, strict=False))
@@ -928,7 +936,42 @@ class GeminiSRTTranslator:
         Returns:
             genai.Client: Configured Gemini client instance
         """
-        client = genai.Client(api_key=self.current_api_key)
+        if self.use_enterprise:
+            if self.cloud_api_key:
+                client = genai.Client(
+                    api_key=self.cloud_api_key,
+                    enterprise=True,
+                    http_options=(
+                        types.HttpOptions(
+                            headers={
+                                "X-Vertex-AI-LLM-Request-Type": self.request_type if self.request_type else "",
+                                "X-Vertex-AI-LLM-Shared-Request-Type": self.service_tier if self.service_tier else "",
+                            }
+                        )
+                    ),
+                )
+            elif self.cloud_project:
+                client = genai.Client(
+                    project=self.cloud_project,
+                    location=self.cloud_location,
+                    enterprise=True,
+                    http_options=(
+                        types.HttpOptions(
+                            headers={
+                                "X-Vertex-AI-LLM-Request-Type": self.request_type if self.request_type else "",
+                                "X-Vertex-AI-LLM-Shared-Request-Type": self.service_tier if self.service_tier else "",
+                            }
+                        )
+                    ),
+                )
+            else:
+                error("Google API key or Cloud project is required for enterprise mode.")
+                exit(1)
+        elif self.current_api_key:
+            client = genai.Client(api_key=self.current_api_key)
+        else:
+            error("Please provide a valid Gemini API key.")
+            exit(1)
         return client
 
     def _get_token_limit(self):
@@ -938,9 +981,10 @@ class GeminiSRTTranslator:
         Returns:
             int: Token limit for the current model
         """
-        client = self._get_client()
-        model = client.models.get(model=self.model_name)
-        self.token_limit = model.output_token_limit
+        if not self.use_enterprise:
+            client = self._get_client()
+            model = client.models.get(model=self.model_name)
+            self.token_limit = model.output_token_limit
 
     def _validate_token_size(self, contents: str) -> bool:
         """
@@ -1303,13 +1347,6 @@ class GeminiSRTTranslator:
             error(f"Audio file {self.audio_file} does not exist.", ignore_quiet=True)
             exit(1)
 
-        if not self.current_api_key:
-            error(
-                "Please provide a valid Gemini API key for transcription.",
-                ignore_quiet=True,
-            )
-            exit(1)
-
         if "gemini" not in self.model_name or ("2.5" not in self.model_name and "3" not in self.model_name):
             error(
                 f"Model {self.model_name} is not available for transcription. Please use a Gemini 2.5 or 3.0 model.",
@@ -1317,7 +1354,7 @@ class GeminiSRTTranslator:
             )
             exit(1)
 
-        if self.service_tier not in ["standard", "flex", "priority"]:
+        if self.service_tier and self.service_tier not in ["standard", "flex", "priority"]:
             error("Service tier must be 'standard', 'flex' or 'priority'.", ignore_quiet=True)
             exit(1)
 
@@ -1638,7 +1675,7 @@ class GeminiSRTTranslator:
                             last_time = current_time
                             continue
 
-                        elif any(err in e_str for err in ["500", "503", "unavailable", "overloaded"]):
+                        elif any(err in e_str for err in ["429", "500", "503", "unavailable", "overloaded"]):
                             server_error_retries += 1
                             if server_error_retries < max_retries:
                                 warning_with_progress(

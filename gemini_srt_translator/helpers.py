@@ -56,7 +56,7 @@ def get_translate_instruction(
 
     # --- Section 3: Core Translation Rules ---
     section_number += 1
-    core_rules = """
+    core_rules = f"""
 ## {section_number}. Core Translation Rules
 - **Translate Text Only**: Only translate the value of the `text` field.
 - **Preserve Formatting**: Keep all existing formatting, including HTML tags (`<i>`, `<b>`) and line breaks (`\\n`).
@@ -66,9 +66,7 @@ def get_translate_instruction(
   - **Do NOT** alter any fields other than `text`.
   - **Do NOT** add, remove, or reorder any items on the list.
   - **Do NOT** merge text between different items. Original and translation must match.
-""".format(
-        section_number=section_number, language=language
-    )
+"""
     prompt_parts.append(core_rules)
 
     # --- Section 4: Advanced Rules (Conditional) ---
@@ -82,7 +80,7 @@ If the text is ambiguous, use the provided audio to infer the correct grammatica
   - If the speaker sounds **female**, use feminine forms.
   - **Example (French):** "I am tired." -> `Je suis fatigué` (male) vs. `Je suis fatiguée` (female).
 - **Analyze Context**: If necessary, listen to the audio before or after the current segment to determine who is being addressed and apply the correct gender and pluralization.
-  - **Example (Spanish):** "You all are tired." -> `Ustedes están cansados` (male/mixed) vs. `Ustedes están cansadas` (female).
+  - **Example (Spanish):** "You are tired." -> `Ustedes están cansados` (male/mixed) vs. `Ustedes están cansadas` (female).
 """
         prompt_parts.append(audio_rules)
 
@@ -156,7 +154,7 @@ The output must be a JSON array. Each object must contain `text`, `time_start`, 
     section_number += 1
     core_rules = f"""
 ## {section_number}. Core Formatting Rules
-- **Timing**: Subtitles must be between **1-7 seconds** in duration.
+- **Timing**: Subtitles must be between **1-5 seconds** in duration.
 - **Content**: Max **42 characters** per line, max **2 lines** per subtitle (use `\\n`).
 - **Line Breaking**: Break lines logically (e.g., after punctuation, before conjunctions). Do not separate closely related words (e.g., article and noun).
 - **Omit Non-Verbal Sounds**: Do not transcribe sounds like `[coughs]` or `[laughs]`. Use italics for song lyrics as described below."""
