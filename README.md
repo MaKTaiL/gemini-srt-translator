@@ -112,6 +112,66 @@ import gemini_srt_translator as gst
 gst.gemini_api_key = "your_api_key_here"
 ```
 
+### ☁️ Agent Platform (Vertex AI) Support
+
+You can also use Google Cloud's **Agent Platform** (formerly known as Vertex AI) instead of the standard Google AI Studio Gemini API.
+
+You can configure it using environment variables or directly via command-line arguments / Python API options.
+
+#### Setup Modes
+
+##### 1. Using Application Default Credentials (ADC)
+
+Recommended when running inside a Google Cloud environment or in local environments configured via `gcloud auth application-default login`.
+
+- **Environment Variables**:
+
+  ```bash
+  export GOOGLE_GENAI_USE_ENTERPRISE="true"
+  export GOOGLE_CLOUD_PROJECT="your-google-cloud-project-id"
+  export GOOGLE_CLOUD_LOCATION="us-central1" # (optional, defaults to 'global')
+  ```
+
+- **CLI Flags**:
+
+  ```bash
+  gst translate -i subtitle.srt -l French --use-enterprise --cloud-project "your-project-id" --cloud-location "us-central1" --request-type "shared"
+  ```
+
+- **Python API**:
+  ```python
+  import gemini_srt_translator as gst
+  gst.use_enterprise = True
+  gst.cloud_project = "your-google-cloud-project-id"
+  gst.cloud_location = "us-central1" # (optional, defaults to 'global')
+  gst.request_type = "shared" # (optional)
+  ```
+
+##### 2. Using API Key (Express Mode)
+
+Authenticate using a specific Google Cloud enterprise API key.
+
+- **Environment Variables**:
+
+  ```bash
+  export GOOGLE_GENAI_USE_ENTERPRISE="true"
+  export GOOGLE_API_KEY="your_google_api_key"
+  ```
+
+- **CLI Flags**:
+
+  ```bash
+  gst translate -i subtitle.srt -l French --use-enterprise --cloud-api-key "your-google-api-key" --request-type "dedicated"
+  ```
+
+- **Python API**:
+  ```python
+  import gemini_srt_translator as gst
+  gst.use_enterprise = True
+  gst.cloud_api_key = "your_google_api_key"
+  gst.request_type = "dedicated" # (optional)
+  ```
+
 ---
 
 ## 🚀 Quick Start
@@ -286,6 +346,11 @@ gst.extract("audio")
 #### 🔧 GST Parameters
 
 - `gemini_api_key2`: Second key for more quota (useful for free Pro models).
+- `use_enterprise`: Enable Enterprise / Agent Platform mode (default: False).
+- `cloud_api_key`: Google Cloud API key for Agent Platform Express mode.
+- `cloud_project`: Google Cloud Project ID for agent platform authentication (ADC).
+- `cloud_location`: Google Cloud Location for agent platform authentication (default: "global").
+- `request_type`: Agent Platform request type (options: `shared`, `dedicated`).
 - `video_file`: Path to a video file to extract subtitles and/or audio for context (requires [FFmpeg](https://ffmpeg.org/)).
 - `audio_file`: Path to an audio file to use as context for translation (requires [FFmpeg](https://ffmpeg.org/)).
 - `extract_audio`: Whether to extract and use audio context from the video file (default: False).

@@ -19,7 +19,7 @@ def get_api_key_from_input() -> str:
     return getpass.getpass("Enter your Gemini API key: ").strip()
 
 
-def get_api_key_from_env(key: str) -> Optional[str]:
+def get_key_from_env(key: str) -> Optional[str]:
     """Get API key from environment variable."""
     api_key = os.getenv(key, None)
     return api_key.strip() if api_key else None
@@ -40,9 +40,9 @@ def validate_file_path(file_path: str, extension: str = None) -> bool:
 
 def select_model_interactive(available_models: list) -> str:
     """Interactive model selection."""
-    print("\nAvailable models:")
+    info("\nAvailable models:")
     for i, model in enumerate(available_models, 1):
-        print(f"{i}. {model}")
+        info(f"{i}. {model}")
 
     while True:
         try:
@@ -57,9 +57,36 @@ def select_model_interactive(available_models: list) -> str:
 
 def cmd_translate(args) -> None:
     """Handle translate command."""
-    # Set API keys
-    gst.gemini_api_key = args.api_key or get_api_key_from_env("GEMINI_API_KEY") or get_api_key_from_input()
-    gst.gemini_api_key2 = args.api_key2 or get_api_key_from_env("GEMINI_API_KEY2")
+
+    is_enterprise = (
+        args.use_enterprise
+        or bool(args.cloud_api_key)
+        or bool(args.cloud_project)
+        or bool(get_key_from_env("GOOGLE_CLOUD_PROJECT"))
+        or bool(get_key_from_env("GOOGLE_API_KEY"))
+        or bool(get_key_from_env("GOOGLE_GENAI_USE_ENTERPRISE"))
+    )
+
+    if is_enterprise:
+        gst.use_enterprise = True
+        if args.request_type:
+            gst.request_type = args.request_type
+        if args.cloud_project or get_key_from_env("GOOGLE_CLOUD_PROJECT"):
+            gst.cloud_project = args.cloud_project or get_key_from_env("GOOGLE_CLOUD_PROJECT")
+            if args.cloud_location or get_key_from_env("GOOGLE_CLOUD_LOCATION"):
+                gst.cloud_location = args.cloud_location or get_key_from_env("GOOGLE_CLOUD_LOCATION")
+        elif args.cloud_api_key or get_key_from_env("GOOGLE_API_KEY"):
+            gst.cloud_api_key = args.cloud_api_key or get_key_from_env("GOOGLE_API_KEY")
+        else:
+            error("Please provide either cloud project or cloud API key for Enterprise.")
+            sys.exit(1)
+    else:
+        if args.api_key:
+            gst.gemini_api_key = args.api_key
+        elif not get_key_from_env("GEMINI_API_KEY"):
+            gst.gemini_api_key = get_api_key_from_input()
+
+    gst.gemini_api_key2 = args.api_key2
 
     # Validate input file
     if args.input_file:
@@ -112,6 +139,8 @@ def cmd_translate(args) -> None:
         gst.thinking_level = args.thinking_level
     if args.service_tier:
         gst.service_tier = args.service_tier
+    if args.request_type:
+        gst.request_type = args.request_type
     if args.token_stats:
         gst.token_stats = args.token_stats
     if args.no_context:
@@ -149,7 +178,34 @@ def cmd_translate(args) -> None:
 
 def cmd_list_models(args) -> None:
     """Handle list-models command."""
-    gst.gemini_api_key = args.api_key or get_api_key_from_env("GEMINI_API_KEY") or get_api_key_from_input()
+
+    is_enterprise = (
+        args.use_enterprise
+        or bool(args.cloud_api_key)
+        or bool(args.cloud_project)
+        or bool(get_key_from_env("GOOGLE_CLOUD_PROJECT"))
+        or bool(get_key_from_env("GOOGLE_API_KEY"))
+        or bool(get_key_from_env("GOOGLE_GENAI_USE_ENTERPRISE"))
+    )
+
+    if is_enterprise:
+        gst.use_enterprise = True
+        if args.request_type:
+            gst.request_type = args.request_type
+        if args.cloud_project or get_key_from_env("GOOGLE_CLOUD_PROJECT"):
+            gst.cloud_project = args.cloud_project or get_key_from_env("GOOGLE_CLOUD_PROJECT")
+            if args.cloud_location or get_key_from_env("GOOGLE_CLOUD_LOCATION"):
+                gst.cloud_location = args.cloud_location or get_key_from_env("GOOGLE_CLOUD_LOCATION")
+        elif args.cloud_api_key or get_key_from_env("GOOGLE_API_KEY"):
+            gst.cloud_api_key = args.cloud_api_key or get_key_from_env("GOOGLE_API_KEY")
+        else:
+            error("Please provide either cloud project or cloud API key for Enterprise.")
+            sys.exit(1)
+    else:
+        if args.api_key:
+            gst.gemini_api_key = args.api_key
+        elif not get_key_from_env("GEMINI_API_KEY"):
+            gst.gemini_api_key = get_api_key_from_input()
 
     try:
         gst.listmodels()
@@ -184,7 +240,34 @@ def cmd_extract(args) -> None:
 
 def cmd_transcribe(args) -> None:
     """Handle transcribe command."""
-    gst.gemini_api_key = args.api_key or get_api_key_from_env("GEMINI_API_KEY") or get_api_key_from_input()
+
+    is_enterprise = (
+        args.use_enterprise
+        or bool(args.cloud_api_key)
+        or bool(args.cloud_project)
+        or bool(get_key_from_env("GOOGLE_CLOUD_PROJECT"))
+        or bool(get_key_from_env("GOOGLE_API_KEY"))
+        or bool(get_key_from_env("GOOGLE_GENAI_USE_ENTERPRISE"))
+    )
+
+    if is_enterprise:
+        gst.use_enterprise = True
+        if args.request_type:
+            gst.request_type = args.request_type
+        if args.cloud_project or get_key_from_env("GOOGLE_CLOUD_PROJECT"):
+            gst.cloud_project = args.cloud_project or get_key_from_env("GOOGLE_CLOUD_PROJECT")
+            if args.cloud_location or get_key_from_env("GOOGLE_CLOUD_LOCATION"):
+                gst.cloud_location = args.cloud_location or get_key_from_env("GOOGLE_CLOUD_LOCATION")
+        elif args.cloud_api_key or get_key_from_env("GOOGLE_API_KEY"):
+            gst.cloud_api_key = args.cloud_api_key or get_key_from_env("GOOGLE_API_KEY")
+        else:
+            error("Please provide either cloud project or cloud API key for Enterprise.")
+            sys.exit(1)
+    else:
+        if args.api_key:
+            gst.gemini_api_key = args.api_key
+        elif not get_key_from_env("GEMINI_API_KEY"):
+            gst.gemini_api_key = get_api_key_from_input()
 
     if args.video_file:
         if not validate_file_path(args.video_file):
@@ -307,7 +390,10 @@ Examples:
     translate_parser.add_argument("--thinking-budget", type=int, help="Thinking budget (0-32768)")
     translate_parser.add_argument("--thinking-level", type=str, help="Thinking level (minimal, low, medium, high)")
     translate_parser.add_argument(
-        "--service-tier", type=str, choices=["standard", "flex", "priority"], help="Service tier for API requests (paid plans only)"
+        "--service-tier",
+        type=str,
+        choices=["standard", "flex", "priority"],
+        help="Service tier for API requests (paid plans only)",
     )
     translate_parser.add_argument("--token-stats", action="store_true", default=None, help="Show token usage")
     translate_parser.add_argument("--no-context", action="store_true", default=None, help="No context between batches")
@@ -331,6 +417,17 @@ Examples:
     )
     translate_parser.add_argument(
         "--extract-audio", action="store_true", default=None, help="Extract audio from video for context"
+    )
+    translate_parser.add_argument(
+        "--use-enterprise", action="store_true", default=None, help="Use Enterprise / Agent Platform mode"
+    )
+    translate_parser.add_argument("--cloud-api-key", help="Google Cloud API key for Enterprise/Vertex Express mode")
+    translate_parser.add_argument("--cloud-project", help="Google Cloud Project ID for enterprise authentication (ADC)")
+    translate_parser.add_argument(
+        "--cloud-location", help="Google Cloud Location for enterprise authentication (defaults to 'global')"
+    )
+    translate_parser.add_argument(
+        "--request-type", choices=["shared", "dedicated"], help="Vertex AI request type ('shared' or 'dedicated')"
     )
 
     # Extract audio command
@@ -357,7 +454,10 @@ Examples:
     transcribe_parser.add_argument("--thinking-budget", type=int, help="Thinking budget (0-32768)")
     transcribe_parser.add_argument("--thinking-level", type=str, help="Thinking level (minimal, low, medium, high)")
     transcribe_parser.add_argument(
-        "--service-tier", type=str, choices=["standard", "flex", "priority"], help="Service tier for API requests (paid plans only)"
+        "--service-tier",
+        type=str,
+        choices=["standard", "flex", "priority"],
+        help="Service tier for API requests (paid plans only)",
     )
     transcribe_parser.add_argument("--token-stats", action="store_true", default=None, help="Show token usage")
     transcribe_parser.add_argument("--temperature", type=float, help="Temperature (0.0-2.0)")
@@ -371,10 +471,34 @@ Examples:
     transcribe_parser.add_argument(
         "--interactive", action="store_true", default=None, help="Interactive model selection"
     )
+    transcribe_parser.add_argument(
+        "--use-enterprise", action="store_true", default=None, help="Use Enterprise / Agent Platform mode"
+    )
+    transcribe_parser.add_argument("--cloud-api-key", help="Google Cloud API key for Enterprise/Vertex Express mode")
+    transcribe_parser.add_argument(
+        "--cloud-project", help="Google Cloud Project ID for enterprise authentication (ADC)"
+    )
+    transcribe_parser.add_argument(
+        "--cloud-location", help="Google Cloud Location for enterprise authentication (defaults to 'global')"
+    )
+    transcribe_parser.add_argument(
+        "--request-type", choices=["shared", "dedicated"], help="Vertex AI request type ('shared' or 'dedicated')"
+    )
 
     # List models command
     list_parser = subparsers.add_parser("list-models", help="List available Gemini models")
     list_parser.add_argument("-k", "--api-key", help="Gemini API key")
+    list_parser.add_argument(
+        "--use-enterprise", action="store_true", default=None, help="Use Enterprise / Agent Platform mode"
+    )
+    list_parser.add_argument("--cloud-api-key", help="Google Cloud API key for Enterprise/Vertex Express mode")
+    list_parser.add_argument("--cloud-project", help="Google Cloud Project ID for enterprise authentication (ADC)")
+    list_parser.add_argument(
+        "--cloud-location", help="Google Cloud Location for enterprise authentication (defaults to 'global')"
+    )
+    list_parser.add_argument(
+        "--request-type", choices=["shared", "dedicated"], help="Vertex AI request type ('shared' or 'dedicated')"
+    )
 
     return parser
 
