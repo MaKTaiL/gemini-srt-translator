@@ -1,3 +1,9 @@
+> [!WARNING]
+> If you are experiencing too many model overloaded messages, switch off streaming mode. 
+
+> [!TIP]
+> For transcription I advise an audio chunk size of 300 (5 minutes). Gemini 3.1 Flash Lite with medium thinking has been surprisingly good at it. It seems whenever Gemini tries to think too much it backfires. Sometimes a simple and direct approach is better.
+
 # 🌟 Gemini SRT Translator
 
 [![PyPI version](https://img.shields.io/pypi/v/gemini-srt-translator)](https://pypi.org/project/gemini-srt-translator)
