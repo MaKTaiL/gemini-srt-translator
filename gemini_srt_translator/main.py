@@ -7,6 +7,7 @@ import typing
 import unicodedata as ud
 from collections import Counter
 from datetime import timedelta
+from typing import Literal
 
 import json_repair
 import srt
@@ -30,7 +31,6 @@ from gemini_srt_translator.logger import (
     save_logs_to_file,
     save_thoughts_to_file,
     set_color_mode,
-    success,
     success_with_progress,
     update_loading_animation,
     warning,
@@ -77,6 +77,11 @@ class GeminiSRTTranslator:
         self,
         gemini_api_key: str = None,
         gemini_api_key2: str = None,
+        use_enterprise: bool = False,
+        cloud_api_key: str = None,
+        cloud_project: str = None,
+        cloud_location: str = "global",
+        request_type: Literal["shared", "dedicated"] = None,
         target_language: str = None,
         input_file: str = None,
         output_file: str = None,
@@ -87,12 +92,15 @@ class GeminiSRTTranslator:
         isolate_voice: bool = True,
         start_line: int = None,
         description: str = None,
-        model_name: str = "gemini-2.5-flash",
-        batch_size: int = 500,
+        model_name: str = "gemini-3.5-flash",
+        batch_size: int = 1000,
         streaming: bool = True,
         thinking: bool = True,
         thinking_budget: int = None,
-        thinking_level: str = None,
+        thinking_level: Literal["minimal", "low", "medium", "high"] = None,
+        service_tier: Literal["standard", "flex", "priority"] = None,
+        token_stats: bool = False,
+        preserve_context: bool = True,
         temperature: float = None,
         top_p: float = None,
         top_k: int = None,
@@ -124,7 +132,7 @@ class GeminiSRTTranslator:
         if output_file:
             self.output_file = output_file
         else:
-            if audio_file and not input_file and not video_file:  # Doar transcriere
+            if audio_file and not input_file and not video_file:
                 suffix = "_transcribed.srt"
             else:
                 suffix = "_translated.srt" if input_file else ".srt"
@@ -135,6 +143,11 @@ class GeminiSRTTranslator:
         self.gemini_api_key = gemini_api_key
         self.gemini_api_key2 = gemini_api_key2
         self.current_api_key = gemini_api_key
+        self.use_enterprise = use_enterprise
+        self.cloud_api_key = cloud_api_key
+        self.cloud_project = cloud_project
+        self.cloud_location = cloud_location
+        self.request_type = request_type
         self.target_language = target_language
         self.input_file = input_file
         self.video_file = video_file
@@ -150,6 +163,9 @@ class GeminiSRTTranslator:
         self.thinking = thinking
         self.thinking_budget = thinking_budget
         self.thinking_level = thinking_level
+        self.service_tier = service_tier
+        self.token_stats = token_stats
+        self.preserve_context = preserve_context
         self.temperature = temperature
         self.top_p = top_p
         self.top_k = top_k
@@ -177,8 +193,7 @@ class GeminiSRTTranslator:
         self.audio_extracted = False
         self.ffmpeg_installed = check_ffmpeg_installation()
         self.consecutive_error_count = 0
-        self.max_consecutive_errors = 5
-        self.thought_signature = None
+        self.max_consecutive_errors = 3
 
         set_color_mode(use_colors)
 
@@ -204,19 +219,15 @@ class GeminiSRTTranslator:
                     self.thinking_budget = 128
         elif "3" in self.model_name:
             self.thinking_budget = None
-            if (
-                "pro" in self.model_name
-                and self.thinking_level is not None
-                and ("medium" in self.thinking_level or "minimal" in self.thinking_level)
-            ):
+            if "pro" in self.model_name and self.thinking_level is not None and "minimal" in self.thinking_level:
                 warning_with_progress(
-                    "You cannot set thinking level to medium or minimal for Gemini 3.0 Pro. Setting thinking level to low.",
+                    "You cannot set thinking level to minimal for Gemini 3 Pro. Setting thinking level to low.",
                     ignore_quiet=True,
                 )
                 self.thinking_level = "low"
             if self.thinking == False:
                 warning_with_progress(
-                    "You cannot disable thinking for Gemini 3.0 models. Setting thinking level to lowest possible.",
+                    "You cannot disable thinking for Gemini 3 models. Setting thinking level to lowest possible.",
                     ignore_quiet=True,
                 )
                 if "pro" in self.model_name:
@@ -238,6 +249,7 @@ class GeminiSRTTranslator:
                 audio_file=self.audio_file,
                 description=self.description,
             ),
+            service_tier=self.service_tier if not self.use_enterprise else None,
             thinking_config=(
                 types.ThinkingConfig(
                     include_thoughts=self.thinking,
@@ -271,19 +283,15 @@ class GeminiSRTTranslator:
                     self.thinking_budget = 128
         elif "3" in self.model_name:
             self.thinking_budget = None
-            if (
-                "pro" in self.model_name
-                and self.thinking_level is not None
-                and ("medium" in self.thinking_level or "minimal" in self.thinking_level)
-            ):
+            if "pro" in self.model_name and self.thinking_level is not None and "minimal" in self.thinking_level:
                 warning_with_progress(
-                    "You cannot set thinking level to medium or minimal for Gemini 3.0 Pro. Setting thinking level to low.",
+                    "You cannot set thinking level to minimal for Gemini 3 Pro. Setting thinking level to low.",
                     ignore_quiet=True,
                 )
                 self.thinking_level = "low"
             if self.thinking == False:
                 warning_with_progress(
-                    "You cannot disable thinking for Gemini 3.0 models. Setting thinking level to lowest possible.",
+                    "You cannot disable thinking for Gemini 3 models. Setting thinking level to lowest possible.",
                     ignore_quiet=True,
                 )
                 if "pro" in self.model_name:
@@ -300,6 +308,7 @@ class GeminiSRTTranslator:
                 thinking_compatible=thinking_compatible,
                 description=self.description,
             ),
+            service_tier=self.service_tier if not self.use_enterprise else None,
             thinking_config=(
                 types.ThinkingConfig(
                     include_thoughts=self.thinking,
@@ -398,7 +407,10 @@ class GeminiSRTTranslator:
                     should_resume = True
                 elif self.resume is None:
                     resume_choice = (
-                        input_prompt(f"Found saved progress. Resume transcription? (y/n): ", mode="resume")
+                        input_prompt(
+                            f"Found saved progress. Resume transcription? (y/n): ",
+                            mode="resume",
+                        )
                         .lower()
                         .strip()
                     )
@@ -439,7 +451,7 @@ class GeminiSRTTranslator:
 
     def getmodels(self):
         """Get available Gemini models that support content generation."""
-        if not self.use_webapi and not self.current_api_key:
+        if not self.use_enterprise and not self.use_webapi and not self.current_api_key:
             error("Please provide a valid Gemini API key.")
             exit(1)
         elif self.use_webapi and not self.secure_1psid and not self.browser:
@@ -461,9 +473,12 @@ class GeminiSRTTranslator:
         models = client.models.list()
         list_models = []
         for model in models:
-            supported_actions = model.supported_actions
-            if "generateContent" in supported_actions:
-                list_models.append(model.name.replace("models/", ""))
+            if self.use_enterprise:
+                list_models.append(model.name.replace("publishers/google/models/", ""))
+            else:
+                supported_actions = model.supported_actions
+                if supported_actions and "generateContent" in supported_actions:
+                    list_models.append(model.name.replace("models/", ""))
         return list_models
 
     def translate(self):
@@ -473,7 +488,10 @@ class GeminiSRTTranslator:
         """
 
         if not self.ffmpeg_installed and self.video_file:
-            error("FFmpeg is not installed. Please install FFmpeg to use video features.", ignore_quiet=True)
+            error(
+                "FFmpeg is not installed. Please install FFmpeg to use video features.",
+                ignore_quiet=True,
+            )
             exit(1)
 
         if self.video_file and self.extract_audio:
@@ -486,7 +504,7 @@ class GeminiSRTTranslator:
 
         if self.audio_file:
             if os.path.exists(self.audio_file):
-                self.audio = AudioSegment.from_file(self.audio_file, format="mp3")
+                self.audio = AudioSegment.from_file(self.audio_file)
             else:
                 error(f"Audio file {self.audio_file} does not exist.", ignore_quiet=True)
                 exit(1)
@@ -501,7 +519,7 @@ class GeminiSRTTranslator:
                 exit(1)
             self.srt_extracted = True
 
-        if not self.use_webapi and not self.current_api_key:
+        if not self.use_enterprise and not self.use_webapi and not self.current_api_key:
             error("Please provide a valid Gemini API key.", ignore_quiet=True)
             exit(1)
         elif self.use_webapi and not self.secure_1psid and not self.browser:
@@ -520,15 +538,25 @@ class GeminiSRTTranslator:
             error("Please provide a subtitle or video file.", ignore_quiet=True)
             exit(1)
 
+        if self.service_tier and self.service_tier not in ["standard", "flex", "priority"]:
+            error("Service tier must be 'standard', 'flex' or 'priority'.", ignore_quiet=True)
+            exit(1)
+
         if self.thinking_budget is not None:
             if "gemini" in self.model_name:
                 if "3" in self.model_name or "2.0" in self.model_name:
                     pass
                 elif "pro" not in self.model_name and (self.thinking_budget < 0 or self.thinking_budget > 24576):
-                    error("Thinking budget must be between 0 and 24576. 0 disables thinking.", ignore_quiet=True)
+                    error(
+                        "Thinking budget must be between 0 and 24576. 0 disables thinking.",
+                        ignore_quiet=True,
+                    )
                     exit(1)
                 elif "pro" in self.model_name and (self.thinking_budget < 128 or self.thinking_budget > 32768):
-                    error("Thinking budget must be between 128 and 32768.", ignore_quiet=True)
+                    error(
+                        "Thinking budget must be between 128 and 32768.",
+                        ignore_quiet=True,
+                    )
                     exit(1)
 
         if self.thinking_level is not None and "gemini-3" in self.model_name:
@@ -538,7 +566,10 @@ class GeminiSRTTranslator:
                 and self.thinking_level != "medium"
                 and self.thinking_level != "high"
             ):
-                error("Thinking level must be 'minimal', 'low', 'medium', or 'high'.", ignore_quiet=True)
+                error(
+                    "Thinking level must be 'minimal', 'low', 'medium', or 'high'.",
+                    ignore_quiet=True,
+                )
                 exit(1)
 
         if self.temperature is not None and (self.temperature < 0 or self.temperature > 2):
@@ -555,13 +586,16 @@ class GeminiSRTTranslator:
 
         self._check_saved_progress()
 
-        models = self.getmodels()
+        if not self.cloud_api_key and not self.use_enterprise:
+            models = self.getmodels()
+            if self.model_name not in models:
+                error(
+                    f"Model {self.model_name} is not available. Please choose a different model.",
+                    ignore_quiet=True,
+                )
+                exit(1)
 
-        if self.model_name not in models:
-            error(f"Model {self.model_name} is not available. Please choose a different model.", ignore_quiet=True)
-            exit(1)
-
-        if not self.use_webapi:
+        if not self.use_webapi and not self.use_enterprise:
             self._get_token_limit()
 
         with open(self.input_file, "r", encoding="utf-8") as original_file:
@@ -610,7 +644,8 @@ class GeminiSRTTranslator:
 
             if self.start_line > len(original_subtitle) or self.start_line < 1:
                 error(
-                    f"Start line must be between 1 and {len(original_subtitle)}. Please try again.", ignore_quiet=True
+                    f"Start line must be between 1 and {len(original_subtitle)}. Please try again.",
+                    ignore_quiet=True,
                 )
                 exit(1)
 
@@ -697,9 +732,23 @@ class GeminiSRTTranslator:
 
             highlight(f"Starting translation of {total - self.start_line + 1} lines...\n")
             if self.use_colors:
-                progress_bar(i, total, prefix="Translating:", suffix=f"\033[31m{self.model_name}", isSending=True)
+                progress_bar(
+                    i,
+                    total,
+                    prefix="Translating:",
+                    suffix=f"\033[31m{self.model_name}",
+                    isSending=True,
+                    token_stats=self.token_stats,
+                )
             else:
-                progress_bar(i, total, prefix="Translating:", suffix=f"{self.model_name}", isSending=True)
+                progress_bar(
+                    i,
+                    total,
+                    prefix="Translating:",
+                    suffix=f"{self.model_name}",
+                    isSending=True,
+                    token_stats=self.token_stats,
+                )
 
             if self.gemini_api_key2:
                 if self.use_colors:
@@ -773,16 +822,16 @@ class GeminiSRTTranslator:
                             batch.pop()
                 try:
                     while not validated:
-                        info_with_progress(f"Validating token size...")
-                        try:
-                            if not self.use_webapi:
+                        if not self.use_enterprise and not self.use_webapi:
+                            info_with_progress(f"Validating token size...")
+                            try:
                                 validated = self._validate_token_size(json.dumps(batch, ensure_ascii=False))
-                            else:
-                                validated = True
-                        except Exception as e:
-                            error_with_progress(f"Error validating token size: {e}")
-                            info_with_progress(f"Retrying validation...")
-                            continue
+                            except Exception as e:
+                                error_with_progress(f"Error validating token size: {e}")
+                                info_with_progress(f"Retrying validation...")
+                                continue
+                        else:
+                            validated = True
                         if not validated:
                             error_with_progress(
                                 f"Token size ({int(self.token_count/0.9)}) exceeds limit ({self.token_limit}) for {self.model_name}."
@@ -832,8 +881,9 @@ class GeminiSRTTranslator:
                         i,
                         total,
                         prefix="Translating:",
-                        suffix=f"\033[31m{self.model_name}" if self.use_colors else f"{self.model_name}",
+                        suffix=(f"\033[31m{self.model_name}" if self.use_colors else f"{self.model_name}"),
                         isSending=True,
+                        token_stats=self.token_stats,
                     )
 
                     self._save_progress(i + 1)
@@ -870,13 +920,13 @@ class GeminiSRTTranslator:
                         last_time = current_time
                         continue
 
-                    elif any(err in e_str for err in ["500", "503", "unavailable", "overloaded"]):
+                    elif any(err in e_str for err in ["429", "500", "503", "unavailable", "overloaded"]):
                         server_overload_retries += 1
                         if server_overload_retries <= max_overload_retries:
                             warning_with_progress(
-                                f"Model is overloaded ({e_str}). Attempt {server_overload_retries}/{max_overload_retries}. Pausing for 3 minutes..."
+                                f"Model is overloaded. Attempt {server_overload_retries}/{max_overload_retries}. Pausing for 60 seconds..."
                             )
-                            time.sleep(180)
+                            time.sleep(60)
                             info_with_progress("Resuming translation...", isSending=True)
                             continue
                         else:
@@ -888,7 +938,7 @@ class GeminiSRTTranslator:
                     else:
                         if isinstance(e, json.decoder.JSONDecodeError):
                             warning_with_progress(f"JSON response error.")
-                        elif "line" in str(e):
+                        elif "line" in str(e) or "empty" in str(e):
                             warning_with_progress(f"{e}")
                         else:
                             warning_with_progress(f"An unexpected error occurred: {e}.")
@@ -896,7 +946,8 @@ class GeminiSRTTranslator:
                         start_index_in_batch = int(batch[0]["index"]) + 1
                         end_index_in_batch = int(batch[-1]["index"]) + 1
                         info_with_progress(
-                            f"Retrying batch for lines {start_index_in_batch}-{end_index_in_batch}...", isSending=True
+                            f"Retrying batch for lines {start_index_in_batch}-{end_index_in_batch}...",
+                            isSending=True,
                         )
 
                         time.sleep(5)
@@ -907,9 +958,9 @@ class GeminiSRTTranslator:
                         continue
 
             if self.use_colors:
-                success_with_progress("\n\033[96m✅ \033[96mTranslation completed successfully!")
+                success_with_progress("\033[96m✅ \033[96mTranslation completed successfully!")
             else:
-                success_with_progress("\n✅ Translation completed successfully!")
+                success_with_progress("✅ Translation completed successfully!")
             if self.progress_log:
                 save_logs_to_file(self.log_file_path)
             translated_file.write(srt.compose(translated_subtitle, reindex=False, strict=False))
@@ -961,8 +1012,43 @@ class GeminiSRTTranslator:
             except Exception as e:
                 error(f"Web API client failed to initialize: {e}\nHint: If using --browser, make sure you are logged into gemini.google.com in your default browser.", ignore_quiet=True)
                 exit(1)
-            
-        client = genai.Client(api_key=self.current_api_key)
+
+        if self.use_enterprise:
+            if self.cloud_api_key:
+                client = genai.Client(
+                    api_key=self.cloud_api_key,
+                    enterprise=True,
+                    http_options=(
+                        types.HttpOptions(
+                            headers={
+                                "X-Vertex-AI-LLM-Request-Type": self.request_type if self.request_type else "",
+                                "X-Vertex-AI-LLM-Shared-Request-Type": self.service_tier if self.service_tier else "",
+                            }
+                        )
+                    ),
+                )
+            elif self.cloud_project:
+                client = genai.Client(
+                    project=self.cloud_project,
+                    location=self.cloud_location,
+                    enterprise=True,
+                    http_options=(
+                        types.HttpOptions(
+                            headers={
+                                "X-Vertex-AI-LLM-Request-Type": self.request_type if self.request_type else "",
+                                "X-Vertex-AI-LLM-Shared-Request-Type": self.service_tier if self.service_tier else "",
+                            }
+                        )
+                    ),
+                )
+            else:
+                error("Google API key or Cloud project is required for enterprise mode.")
+                exit(1)
+        elif self.current_api_key:
+            client = genai.Client(api_key=self.current_api_key)
+        else:
+            error("Please provide a valid Gemini API key.")
+            exit(1)
         return client
 
     def _get_token_limit(self):
@@ -972,9 +1058,10 @@ class GeminiSRTTranslator:
         Returns:
             int: Token limit for the current model
         """
-        client = self._get_client()
-        model = client.models.get(model=self.model_name)
-        self.token_limit = model.output_token_limit
+        if not self.use_enterprise:
+            client = self._get_client()
+            model = client.models.get(model=self.model_name)
+            self.token_limit = model.output_token_limit
 
     def _validate_token_size(self, contents: str) -> bool:
         """
@@ -987,7 +1074,7 @@ class GeminiSRTTranslator:
             bool: True if token size is valid, False otherwise
         """
         client = self._get_client()
-        token_count = client.models.count_tokens(model="gemini-2.5-flash-lite", contents=contents)
+        token_count = client.models.count_tokens(model="gemini-3.1-flash-lite", contents=contents)
         self.token_count = token_count.total_tokens
         if token_count.total_tokens > self.token_limit * 0.9:
             return False
@@ -1023,29 +1110,33 @@ class GeminiSRTTranslator:
 
         done = False
         retry = -1
+        previous_prompt_tokens = 0
+        previous_thoughts_tokens = 0
+        previous_output_tokens = 0
+        previous_total_tokens = 0
         while done == False:
             response_text = ""
             thoughts_text = ""
             chunk_size = 0
             self.translated_batch = []
-            processed = True
             done_thinking = False
             retry += 1
             blocked = False
+            thoughts_signature = None
             if not self.streaming:
                 response = client.models.generate_content(
-                    model=self.model_name, contents=contents, config=self._get_translate_config()
+                    model=self.model_name,
+                    contents=contents,
+                    config=self._get_translate_config(),
                 )
                 if response.prompt_feedback:
                     blocked = True
                     break
                 if not response.text:
-                    error_with_progress("Gemini has returned an empty response.")
-                    info_with_progress("Sending last batch again...", isSending=True)
-                    continue
+                    raise ValueError("Gemini has returned an empty response.")
                 for part in response.candidates[0].content.parts:
                     if part.thought_signature:
-                        self.thought_signature = part.thought_signature
+                        thoughts_signature = part.thought_signature
                     if not part.text:
                         continue
                     elif part.thought:
@@ -1060,11 +1151,26 @@ class GeminiSRTTranslator:
                         info_with_progress(f"Batch {self.batch_number}.{retry} thinking process saved to file.")
                     save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
                 self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text)
+                if not isinstance(self.translated_batch, list) or not all(
+                    isinstance(item, dict) for item in self.translated_batch
+                ):
+                    self.translated_batch = self._flatten_repaired_json(self.translated_batch)
+                chunk_size = len(self.translated_batch)
+                update_loading_animation(
+                    chunk_size=chunk_size,
+                    token_stats=self.token_stats,
+                    prompt_tokens=response.usage_metadata.prompt_token_count,
+                    thoughts_tokens=response.usage_metadata.thoughts_token_count,
+                    output_tokens=response.usage_metadata.candidates_token_count,
+                    total_tokens=response.usage_metadata.total_token_count,
+                )
             else:
                 if blocked:
                     break
                 response = client.models.generate_content_stream(
-                    model=self.model_name, contents=contents, config=self._get_translate_config()
+                    model=self.model_name,
+                    contents=contents,
+                    config=self._get_translate_config(),
                 )
                 for chunk in response:
                     if chunk.prompt_feedback:
@@ -1073,35 +1179,85 @@ class GeminiSRTTranslator:
                     if chunk.candidates[0].content.parts:
                         for part in chunk.candidates[0].content.parts:
                             if part.thought_signature:
-                                self.thought_signature = part.thought_signature
+                                thoughts_signature = part.thought_signature
                             if not part.text:
                                 continue
                             elif part.thought:
-                                update_loading_animation(chunk_size=chunk_size, isThinking=True)
                                 thoughts_text += part.text
-                                continue
                             else:
-                                if not done_thinking and self.thoughts_log and self.thinking:
-                                    if retry == 0:
-                                        info_with_progress(f"Batch {self.batch_number} thinking process saved to file.")
-                                    else:
-                                        info_with_progress(
-                                            f"Batch {self.batch_number}.{retry} thinking process saved to file."
-                                        )
-                                    save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
+                                if not done_thinking:
                                     done_thinking = True
+                                    if self.thoughts_log and self.thinking:
+                                        if retry == 0:
+                                            info_with_progress(
+                                                f"Batch {self.batch_number} thinking process saved to file."
+                                            )
+                                        else:
+                                            info_with_progress(
+                                                f"Batch {self.batch_number}.{retry} thinking process saved to file."
+                                            )
+                                        save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
                                 response_text += part.text
-                                self.translated_batch: list[SubtitleObject] = json_repair.loads(response_text)
+                                self.translated_batch: list[SubtitleObject] = json_repair.loads(
+                                    response_text, stream_stable=True
+                                )
+                                if not isinstance(self.translated_batch, list) or not all(
+                                    isinstance(item, dict) for item in self.translated_batch
+                                ):
+                                    self.translated_batch = self._flatten_repaired_json(self.translated_batch)
                     chunk_size = len(self.translated_batch)
-                    if chunk_size == 0:
-                        continue
-                    self._process_translated_lines(
-                        translated_lines=self.translated_batch,
-                        translated_subtitle=translated_subtitle,
-                        batch=batch,
-                        finished=False,
+                    if chunk_size > 0:
+                        self._process_translated_lines(
+                            translated_lines=self.translated_batch,
+                            translated_subtitle=translated_subtitle,
+                            batch=batch,
+                            finished=False,
+                        )
+                    update_loading_animation(
+                        chunk_size=chunk_size,
+                        isThinking=self.thinking and not done_thinking,
+                        token_stats=self.token_stats,
+                        prompt_tokens=(
+                            chunk.usage_metadata.prompt_token_count - previous_prompt_tokens
+                            if chunk.usage_metadata and chunk.usage_metadata.prompt_token_count
+                            else None
+                        ),
+                        thoughts_tokens=(
+                            chunk.usage_metadata.thoughts_token_count - previous_thoughts_tokens
+                            if chunk.usage_metadata and chunk.usage_metadata.thoughts_token_count
+                            else None
+                        ),
+                        output_tokens=(
+                            chunk.usage_metadata.candidates_token_count - previous_output_tokens
+                            if chunk.usage_metadata and chunk.usage_metadata.candidates_token_count
+                            else None
+                        ),
+                        total_tokens=(
+                            chunk.usage_metadata.total_token_count - previous_total_tokens
+                            if chunk.usage_metadata and chunk.usage_metadata.total_token_count
+                            else None
+                        ),
                     )
-                    update_loading_animation(chunk_size=chunk_size)
+                    previous_prompt_tokens = (
+                        chunk.usage_metadata.prompt_token_count
+                        if chunk.usage_metadata and chunk.usage_metadata.prompt_token_count
+                        else 0
+                    )
+                    previous_thoughts_tokens = (
+                        chunk.usage_metadata.thoughts_token_count
+                        if chunk.usage_metadata and chunk.usage_metadata.thoughts_token_count
+                        else 0
+                    )
+                    previous_output_tokens = (
+                        chunk.usage_metadata.candidates_token_count
+                        if chunk.usage_metadata and chunk.usage_metadata.candidates_token_count
+                        else 0
+                    )
+                    previous_total_tokens = (
+                        chunk.usage_metadata.total_token_count
+                        if chunk.usage_metadata and chunk.usage_metadata.total_token_count
+                        else 0
+                    )
 
             if len(self.translated_batch) == len(batch):
                 self._process_translated_lines(
@@ -1113,8 +1269,7 @@ class GeminiSRTTranslator:
                 done = True
                 self.batch_number += 1
             else:
-                if processed:
-                    raise ValueError(f"Expected {len(batch)} lines, got {len(self.translated_batch)}.")
+                raise ValueError(f"Expected {len(batch)} lines, got {len(self.translated_batch)}.")
 
         if blocked:
             error_with_progress(
@@ -1122,18 +1277,41 @@ class GeminiSRTTranslator:
             )
             signal.raise_signal(signal.SIGINT)
         parts = []
-        (
-            parts.append(types.Part(thought_signature=self.thought_signature))
-            if self.thought_signature
-            else parts.append(types.Part(thought=True, text=thoughts_text)) if thoughts_text else None
-        )
-        parts.append(types.Part(text=response_text))
+        if thoughts_signature:
+            parts.append(types.Part(text=response_text, thought_signature=thoughts_signature))
+        else:
+            parts.append(types.Part(text=response_text))
         previous_content = [
-            types.Content(role="user", parts=[types.Part(text=json.dumps(batch, ensure_ascii=False))]),
+            types.Content(
+                role="user",
+                parts=[types.Part(text=json.dumps(batch, ensure_ascii=False))],
+            ),
             types.Content(role="model", parts=parts),
         ]
         batch.clear()
-        return previous_content
+        return previous_content if self.preserve_context else []
+
+    @staticmethod
+    def _flatten_repaired_json(data) -> list:
+        """
+        Flatten nested structures produced by json_repair when partial JSON
+        contains \\n-[ patterns (newline + bracket in subtitle text).
+
+        json_repair can misinterpret these as array boundaries, producing
+        nested lists like [[{...}, {...}], ["text"]] instead of [{...}, {...}].
+        This extracts all valid dict items from the nested structure.
+        """
+        result = []
+        if not isinstance(data, list):
+            return result
+        for item in data:
+            if isinstance(item, dict):
+                result.append(item)
+            elif isinstance(item, list):
+                for sub in item:
+                    if isinstance(sub, dict):
+                        result.append(sub)
+        return result
 
     def _process_batch_webapi(
         self,
@@ -1324,7 +1502,10 @@ class GeminiSRTTranslator:
         Extract audio or subtitles from the video file using FFmpeg.
         """
         if not self.ffmpeg_installed:
-            error("FFmpeg is not installed. Please install FFmpeg to use this feature.", ignore_quiet=True)
+            error(
+                "FFmpeg is not installed. Please install FFmpeg to use this feature.",
+                ignore_quiet=True,
+            )
             exit(1)
 
         if not self.video_file or not os.path.exists(self.video_file):
@@ -1339,7 +1520,10 @@ class GeminiSRTTranslator:
         elif type == "srt":
             self.input_file = extract_srt_from_video(self.video_file)
             if not self.input_file:
-                error("Failed to extract subtitles from the video file.", ignore_quiet=True)
+                error(
+                    "Failed to extract subtitles from the video file.",
+                    ignore_quiet=True,
+                )
                 exit(1)
         else:
             error("Invalid extraction type. Use 'audio' or 'srt'.", ignore_quiet=True)
@@ -1358,14 +1542,17 @@ class GeminiSRTTranslator:
             extracted = True
 
         if not self.audio_file:
-            error("Please provide a valid audio or video file for transcription.", ignore_quiet=True)
+            error(
+                "Please provide a valid audio or video file for transcription.",
+                ignore_quiet=True,
+            )
             exit(1)
 
         if not os.path.exists(self.audio_file):
             error(f"Audio file {self.audio_file} does not exist.", ignore_quiet=True)
             exit(1)
 
-        if not self.use_webapi and not self.current_api_key:
+        if not self.use_enterprise and not self.use_webapi and not self.current_api_key:
             error("Please provide a valid Gemini API key for transcription.", ignore_quiet=True)
             exit(1)
         elif self.use_webapi and not self.secure_1psid and not self.browser:
@@ -1379,15 +1566,25 @@ class GeminiSRTTranslator:
             )
             exit(1)
 
+        if self.service_tier and self.service_tier not in ["standard", "flex", "priority"]:
+            error("Service tier must be 'standard', 'flex' or 'priority'.", ignore_quiet=True)
+            exit(1)
+
         if self.thinking_budget is not None:
             if "gemini" in self.model_name:
                 if "3" in self.model_name or "2.0" in self.model_name:
                     pass
                 elif "pro" not in self.model_name and (self.thinking_budget < 0 or self.thinking_budget > 24576):
-                    error("Thinking budget must be between 0 and 24576. 0 disables thinking.", ignore_quiet=True)
+                    error(
+                        "Thinking budget must be between 0 and 24576. 0 disables thinking.",
+                        ignore_quiet=True,
+                    )
                     exit(1)
                 elif "pro" in self.model_name and (self.thinking_budget < 128 or self.thinking_budget > 32768):
-                    error("Thinking budget must be between 128 and 32768.", ignore_quiet=True)
+                    error(
+                        "Thinking budget must be between 128 and 32768.",
+                        ignore_quiet=True,
+                    )
                     exit(1)
 
         if self.thinking_level is not None and "gemini-3" in self.model_name:
@@ -1397,7 +1594,10 @@ class GeminiSRTTranslator:
                 and self.thinking_level != "medium"
                 and self.thinking_level != "high"
             ):
-                error("Thinking level must be 'minimal', 'low', 'medium', or 'high'.", ignore_quiet=True)
+                error(
+                    "Thinking level must be 'minimal', 'low', 'medium', or 'high'.",
+                    ignore_quiet=True,
+                )
                 exit(1)
 
         if self.temperature is not None and (self.temperature < 0 or self.temperature > 2):
@@ -1465,9 +1665,10 @@ class GeminiSRTTranslator:
                     current_length,
                     audio_length,
                     prefix="Transcribing:",
-                    suffix=f"\033[31m{self.model_name}" if self.use_colors else f"{self.model_name}",
+                    suffix=(f"\033[31m{self.model_name}" if self.use_colors else f"{self.model_name}"),
                     isSending=True,
                     isTranscribing=True,
+                    token_stats=self.token_stats,
                 )
                 if self.use_colors:
                     info_with_progress(
@@ -1505,6 +1706,11 @@ class GeminiSRTTranslator:
                         retry = -1
                         blocked = False
                         done_thinking = False
+                        previous_prompt_tokens = 0
+                        previous_thoughts_tokens = 0
+                        previous_output_tokens = 0
+                        previous_total_tokens = 0
+                        processed_seconds = 0
                         while not done:
                             response_text = ""
                             thoughts_text = ""
@@ -1555,6 +1761,16 @@ class GeminiSRTTranslator:
                                             isTranscribing=True,
                                         )
                                     save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
+                                update_loading_animation(
+                                    chunk_size=processed_seconds if processed_seconds else 0,
+                                    isTranscribing=True,
+                                    isThinking=self.thinking and not done_thinking,
+                                    token_stats=self.token_stats,
+                                    prompt_tokens=response.usage_metadata.prompt_token_count,
+                                    thoughts_tokens=response.usage_metadata.thoughts_token_count,
+                                    output_tokens=response.usage_metadata.candidates_token_count,
+                                    total_tokens=response.usage_metadata.total_token_count,
+                                )
                             else:
                                 if blocked:
                                     break
@@ -1607,21 +1823,32 @@ class GeminiSRTTranslator:
                                                         chunk_size=0, isThinking=True, isTranscribing=True
                                                     )
                                                 else:
-                                                    if not done_thinking and self.thoughts_log and self.thinking:
-                                                        if retry == 0:
-                                                            info_with_progress(
-                                                                f"Batch {self.batch_number} thinking process saved to file.",
-                                                                isTranscribing=True,
-                                                            )
-                                                        else:
-                                                            info_with_progress(
-                                                                f"Batch {self.batch_number}.{retry} thinking process saved to file.",
-                                                                isTranscribing=True,
-                                                            )
-                                                        save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
+                                                    if not done_thinking:
                                                         done_thinking = True
+                                                        if self.thoughts_log and self.thinking:
+                                                            if retry == 0:
+                                                                info_with_progress(
+                                                                    f"Batch {self.batch_number} thinking process saved to file.",
+                                                                    isTranscribing=True,
+                                                                )
+                                                            else:
+                                                                info_with_progress(
+                                                                    f"Batch {self.batch_number}.{retry} thinking process saved to file.",
+                                                                    isTranscribing=True,
+                                                                )
+                                                            save_thoughts_to_file(
+                                                                thoughts_text,
+                                                                self.thoughts_file_path,
+                                                                retry,
+                                                            )
                                                     response_text += part.text
-                                                    transcription_json = json_repair.loads(response_text)
+                                                    transcription_json = json_repair.loads(
+                                                        response_text, stream_stable=True
+                                                    )
+                                                    if not isinstance(transcription_json, list) or not all(
+                                                        isinstance(item, dict) for item in transcription_json
+                                                    ):
+                                                        transcription_json = self._flatten_repaired_json(transcription_json)
                                                     if len(transcription_json) > 1:
                                                         if "time_end" in transcription_json[-2]:
                                                             ts_for_anim = _normalize_timestamp(
@@ -1630,14 +1857,62 @@ class GeminiSRTTranslator:
                                                             processed_seconds = convert_timestamp_to_timedelta(
                                                                 ts_for_anim
                                                             ).total_seconds()
-                                                            update_loading_animation(
-                                                                int(processed_seconds), isTranscribing=True
-                                                            )
+
+                                            update_loading_animation(
+                                                chunk_size=processed_seconds if processed_seconds else 0,
+                                                isTranscribing=True,
+                                                isThinking=self.thinking and not done_thinking,
+                                                token_stats=self.token_stats,
+                                                prompt_tokens=(
+                                                    chunk.usage_metadata.prompt_token_count - previous_prompt_tokens
+                                                    if chunk.usage_metadata and chunk.usage_metadata.prompt_token_count
+                                                    else None
+                                                ),
+                                                thoughts_tokens=(
+                                                    chunk.usage_metadata.thoughts_token_count - previous_thoughts_tokens
+                                                    if chunk.usage_metadata and chunk.usage_metadata.thoughts_token_count
+                                                    else None
+                                                ),
+                                                output_tokens=(
+                                                    chunk.usage_metadata.candidates_token_count - previous_output_tokens
+                                                    if chunk.usage_metadata and chunk.usage_metadata.candidates_token_count
+                                                    else None
+                                                ),
+                                                total_tokens=(
+                                                    chunk.usage_metadata.total_token_count - previous_total_tokens
+                                                    if chunk.usage_metadata and chunk.usage_metadata.total_token_count
+                                                    else None
+                                                ),
+                                            )
+                                            previous_prompt_tokens = (
+                                                chunk.usage_metadata.prompt_token_count
+                                                if chunk.usage_metadata and chunk.usage_metadata.prompt_token_count
+                                                else 0
+                                            )
+                                            previous_thoughts_tokens = (
+                                                chunk.usage_metadata.thoughts_token_count
+                                                if chunk.usage_metadata and chunk.usage_metadata.thoughts_token_count
+                                                else 0
+                                            )
+                                            previous_output_tokens = (
+                                                chunk.usage_metadata.candidates_token_count
+                                                if chunk.usage_metadata and chunk.usage_metadata.candidates_token_count
+                                                else 0
+                                            )
+                                            previous_total_tokens = (
+                                                chunk.usage_metadata.total_token_count
+                                                if chunk.usage_metadata and chunk.usage_metadata.total_token_count
+                                                else 0
+                                            )
 
                             if blocked:
                                 raise Exception("Content blocked by the API.")
 
                             transcription_json = json_repair.loads(response_text)
+                            if not isinstance(transcription_json, list) or not all(
+                                isinstance(item, dict) for item in transcription_json
+                            ):
+                                transcription_json = self._flatten_repaired_json(transcription_json)
 
                             for i in range(len(transcription_json)):
                                 start_ts = _normalize_timestamp(transcription_json[i]["time_start"])
@@ -1674,14 +1949,14 @@ class GeminiSRTTranslator:
                             last_time = current_time
                             continue
 
-                        elif any(err in e_str for err in ["500", "503", "unavailable", "overloaded"]):
+                        elif any(err in e_str for err in ["429", "500", "503", "unavailable", "overloaded"]):
                             server_error_retries += 1
                             if server_error_retries < max_retries:
                                 warning_with_progress(
-                                    f"Model is overloaded ({e_str}). Attempt {server_error_retries + 1}/{max_retries}. Pausing for 3 minutes...",
+                                    f"Model is overloaded. Attempt {server_error_retries + 1}/{max_retries}. Pausing for 60 seconds...",
                                     isTranscribing=True,
                                 )
-                                time.sleep(180)
+                                time.sleep(60)
                                 continue
                             else:
                                 error_with_progress(
@@ -1692,7 +1967,8 @@ class GeminiSRTTranslator:
 
                         else:
                             warning_with_progress(
-                                f"An unexpected error occurred: {e_str}. Retrying immediately...", isTranscribing=True
+                                f"An unexpected error occurred: {e_str}. Retrying immediately...",
+                                isTranscribing=True,
                             )
                             time.sleep(1)
                             continue
@@ -1711,7 +1987,7 @@ class GeminiSRTTranslator:
                 audio_length,
                 audio_length,
                 prefix="Transcribing:",
-                suffix=f"\033[31m{self.model_name}" if self.use_colors else f"{self.model_name}",
+                suffix=(f"\033[31m{self.model_name}" if self.use_colors else f"{self.model_name}"),
                 isTranscribing=True,
             )
             with open(self.output_file, "w", encoding="utf-8") as f:
@@ -1719,7 +1995,8 @@ class GeminiSRTTranslator:
 
             if self.use_colors:
                 success_with_progress(
-                    f"\n\033[96mTranscription saved to\033[92m {self.output_file}", isTranscribing=True
+                    f"\n\033[96mTranscription saved to\033[92m {self.output_file}",
+                    isTranscribing=True,
                 )
             else:
                 success_with_progress(f"\nTranscription saved to {self.output_file}", isTranscribing=True)

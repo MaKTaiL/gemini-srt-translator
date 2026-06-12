@@ -1,3 +1,9 @@
+> [!WARNING]
+> If you are experiencing too many model overloaded messages, switch off streaming mode. 
+
+> [!TIP]
+> For transcription I advise an audio chunk size of 300 (5 minutes). Gemini 3.1 Flash Lite with medium thinking has been surprisingly good at it. It seems whenever Gemini tries to think too much it backfires. Sometimes a simple and direct approach is better.
+
 # 🌟 Gemini SRT Translator
 
 [![PyPI version](https://img.shields.io/pypi/v/gemini-srt-translator)](https://pypi.org/project/gemini-srt-translator)
@@ -21,7 +27,7 @@
 - 🌐 **Web API Support**: Use Gemini through your browser session (cookies) instead of an official API key, ideal for bypassing SDK limitations or for personal use.
 - ⏱️ **Timing & Format**: Ensures that the translated subtitles maintain the exact timestamps and basic SRT formatting of the original file.
 - 💾 **Quick Resume**: Easily resume interrupted translations from where you left off.
-- 🧠 **Advanced AI**: Leverages multi-turn chat sessions and reasoning capabilities for more contextually accurate and consistent translations.
+- 🧠 **Advanced AI**: Leverages multi-turn chat sessions, thinking, and reasoning capabilities for more contextually accurate and consistent translations (available on Gemini 2.5 and 3 models).
 - 🖥️ **CLI Support**: Full command-line interface for easy automation and scripting.
 - ⚙️ **Customizable**: Tune model parameters, adjust batch size, and access other advanced settings.
 - 🎞️ **SRT Extraction**: Extract and translate SRT subtitles from video files automatically (requires [FFmpeg](https://ffmpeg.org/)).
@@ -104,22 +110,82 @@ You can provide your API key in several ways:
 
 2. **Command Line Argument**: Use the `-k` or `--api-key` flag
 
-   ```bash
-   gst translate -i subtitle.srt -l French -k YOUR_API_KEY
-   ```
+```bash
+gst translate -i subtitle.srt -l French -k YOUR_API_KEY
+```
 
 3. **Interactive Prompt**: The tool will prompt you if no key is found
 
-   ```bash
-   gst translate -i subtitle.srt -l French
-   ```
+```bash
+gst translate -i subtitle.srt -l French
+```
 
 4. **Python API**: Set the `gemini_api_key` variable in your script
 
-   ```python
-   import gemini_srt_translator as gst
-   gst.gemini_api_key = "your_api_key_here"
-   ```
+```python
+import gemini_srt_translator as gst
+gst.gemini_api_key = "your_api_key_here"
+```
+
+### ☁️ Agent Platform (Vertex AI) Support
+
+You can also use Google Cloud's **Agent Platform** (formerly known as Vertex AI) instead of the standard Google AI Studio Gemini API.
+
+You can configure it using environment variables or directly via command-line arguments / Python API options.
+
+#### Setup Modes
+
+##### 1. Using Application Default Credentials (ADC)
+
+Recommended when running inside a Google Cloud environment or in local environments configured via `gcloud auth application-default login`.
+
+- **Environment Variables**:
+
+  ```bash
+  export GOOGLE_GENAI_USE_ENTERPRISE="true"
+  export GOOGLE_CLOUD_PROJECT="your-google-cloud-project-id"
+  export GOOGLE_CLOUD_LOCATION="us-central1" # (optional, defaults to 'global')
+  ```
+
+- **CLI Flags**:
+
+  ```bash
+  gst translate -i subtitle.srt -l French --use-enterprise --cloud-project "your-project-id" --cloud-location "us-central1" --request-type "shared"
+  ```
+
+- **Python API**:
+  ```python
+  import gemini_srt_translator as gst
+  gst.use_enterprise = True
+  gst.cloud_project = "your-google-cloud-project-id"
+  gst.cloud_location = "us-central1" # (optional, defaults to 'global')
+  gst.request_type = "shared" # (optional)
+  ```
+
+##### 2. Using API Key (Express Mode)
+
+Authenticate using a specific Google Cloud enterprise API key.
+
+- **Environment Variables**:
+
+  ```bash
+  export GOOGLE_GENAI_USE_ENTERPRISE="true"
+  export GOOGLE_API_KEY="your_google_api_key"
+  ```
+
+- **CLI Flags**:
+
+  ```bash
+  gst translate -i subtitle.srt -l French --use-enterprise --cloud-api-key "your-google-api-key" --request-type "dedicated"
+  ```
+
+- **Python API**:
+  ```python
+  import gemini_srt_translator as gst
+  gst.use_enterprise = True
+  gst.cloud_api_key = "your_google_api_key"
+  gst.request_type = "dedicated" # (optional)
+  ```
 
 ### 🍪 Web API Cookies (Optional Backend)
 
@@ -185,13 +251,16 @@ gst translate \
   -k YOUR_API_KEY \
   -k2 YOUR_SECOND_API_KEY \
   -o output_french.srt \
-  --model gemini-2.5-flash \
+  --model gemini-3.5-flash \
+  --service-tier standard \
   --batch-size 150 \
   --temperature 0.7 \
   --description "Medical TV series, use medical terminology" \
   --progress-log \
   --thoughts-log \
   --extract-audio \
+  --token-stats \
+  --no-context
 ```
 
 #### Transcribing Audio/Video
@@ -207,8 +276,11 @@ gst transcribe -a audio.mp3 -o transcription.srt
 gst transcribe \
   -v video.mp4 \
   -o transcription.srt \
-  --model gemini-2.5-flash \
+  --model gemini-3.5-flash \
+  --service-tier standard \
   --description "Meeting recording about project X" \
+  --thinking-level high \
+  --token-stats
 ```
 
 #### Extracting Audio/Subtitles
@@ -276,7 +348,8 @@ import gemini_srt_translator as gst
 gst.gemini_api_key = "your_api_key"
 gst.video_file = "video.mp4" # Or gst.audio_file = "audio.mp3"
 gst.output_file = "transcription.srt"
-gst.model_name = "gemini-2.5-flash"
+gst.model_name = "gemini-3.5-flash"
+gst.token_stats = True
 
 gst.transcribe()
 ```
@@ -324,6 +397,11 @@ gst.extract("audio")
 - `secure_1psid`: The `__Secure-1PSID` cookie value for Web API.
 - `secure_1psidts`: The `__Secure-1PSIDTS` cookie value for Web API (optional).
 - `proxy`: Custom proxy address for the Web API (optional).
+- `use_enterprise`: Enable Enterprise / Agent Platform mode (default: False).
+- `cloud_api_key`: Google Cloud API key for Agent Platform Express mode.
+- `cloud_project`: Google Cloud Project ID for agent platform authentication (ADC).
+- `cloud_location`: Google Cloud Location for agent platform authentication (default: "global").
+- `request_type`: Agent Platform request type (options: `shared`, `dedicated`).
 - `video_file`: Path to a video file to extract subtitles and/or audio for context (requires [FFmpeg](https://ffmpeg.org/)).
 - `audio_file`: Path to an audio file to use as context for translation (requires [FFmpeg](https://ffmpeg.org/)).
 - `extract_audio`: Whether to extract and use audio context from the video file (default: False).
@@ -332,18 +410,20 @@ gst.extract("audio")
 - `output_file`: Name of the translated file.
 - `start_line`: Starting line for translation.
 - `description`: Description of the translation job.
-- `batch_size`: Batch size (default: 300).
+- `batch_size`: Batch size (default: 1000).
 - `free_quota`: Signal GST that you are using a free quota (default: True).
 - `skip_upgrade`: Skip version upgrade check (default: False).
 - `use_colors`: Activate colors in terminal (default: True).
 - `progress_log`: Enable progress logging to a file (default: False).
 - `thoughts_log`: Enable logging of the 'thinking' process to a file (default: False).
-- `quiet_mode`: Suppress all output (default: False).
+- `quiet`: Suppress all output (default: False).
 - `resume`: Skip prompt and set automatic resume mode.
+- `token_stats`: Show token usage information (default: False).
+- `preserve_context`: Preserve context between batches (default: True).
 
 #### 🔬 Model Tuning Parameters
 
-- `model_name`: Gemini model (default: "gemini-2.5-flash-preview-05-20").
+- `model_name`: Gemini model (default: "gemini-3.5-flash").
 - `temperature`: Controls randomness in output. Lower for more deterministic, higher for more creative (range: 0.0-2.0).
 - `top_p`: Nucleus sampling parameter (range: 0.0-1.0).
 - `top_k`: Top-k sampling parameter (range: >=0).
@@ -355,6 +435,8 @@ gst.extract("audio")
   - Only available for Gemini 2.5 models.
 - `thinking_level`: Controls the depth of thinking process (options: minimal, low, medium, high).
   - Only available for Gemini 3 models.
+- `service_tier`: Service tier for Gemini API (options: `standard`, `flex`, `priority`).
+  - Only available on paid plans.
 
 #### 💡 Full example:
 
@@ -371,7 +453,7 @@ gst.audio_file = "audio.mp3"
 gst.extract_audio = False
 gst.start_line = 20
 gst.description = "Medical TV series, use medical terms"
-gst.model_name = "gemini-2.5-pro-preview-03-25"
+gst.model_name = "gemini-3.5-flash"
 gst.batch_size = 150
 gst.streaming = True
 gst.thinking = True
@@ -385,8 +467,11 @@ gst.skip_upgrade = True
 gst.use_colors = False
 gst.progress_log = True
 gst.thoughts_log = True
-gst.quiet_mode = False
+gst.quiet = False
 gst.resume = True
+gst.token_stats = True
+gst.preserve_context = True
+gst.service_tier = "standard"
 
 gst.translate()
 ```
@@ -439,5 +524,6 @@ Thank you to all who have contributed to this project:
 - [sjiampojamarn](https://github.com/sjiampojamarn)
 - [mkaflowski](https://github.com/mkaflowski)
 - [fr0stb1rd](https://github.com/fr0stb1rd)
+- [iceman1010](https://github.com/iceman1010)
 
 Special thanks to all users who have reported issues, suggested features, and helped improve the project.

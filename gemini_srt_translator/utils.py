@@ -8,6 +8,8 @@ from datetime import timedelta
 import requests
 from packaging import version
 
+from gemini_srt_translator.logger import error
+
 from .logger import highlight, info, input_prompt, set_color_mode, success
 
 
@@ -44,12 +46,13 @@ def get_latest_pypi_version(package_name):
     return None
 
 
-def display_progress_bar(stop_event, package_name):
+def display_progress_bar(stop_event, error_event, package_name):
     """Display a custom progress bar."""
     width = 40
     position = 0
     direction = 1  # 1 for right, -1 for left
     bar_length = 10  # Length of the moving part
+    has_started = False
 
     while not stop_event.is_set():
         # Update position
@@ -61,14 +64,21 @@ def display_progress_bar(stop_event, package_name):
 
         # Create the progress bar
         bar = "[" + " " * position + "#" * bar_length + " " * (width - position - bar_length) + "]"
-        sys.stdout.write(f"\rInstalling {package_name}: {bar}")
+        if has_started:
+            sys.stdout.write("\033[A")
+            sys.stdout.write(f"\rInstalling {package_name}: {bar}\n")
+        else:
+            sys.stdout.write(f"\rInstalling {package_name}: {bar}\n")
+            has_started = True
         sys.stdout.flush()
         time.sleep(0.1)
 
     # Show complete when done
-    bar = "[" + "#" * width + "]"
-    sys.stdout.write(f"\rInstalling {package_name}: {bar} Complete!")
-    sys.stdout.flush()
+    if not error_event.is_set():
+        bar = "[" + "#" * width + "]"
+        sys.stdout.write("\033[A")
+        sys.stdout.write(f"\rInstalling {package_name}: {bar}\n")
+        sys.stdout.flush()
 
 
 def upgrade_package(package_name, use_colors=True):
@@ -77,6 +87,9 @@ def upgrade_package(package_name, use_colors=True):
     latest_version = get_latest_pypi_version(package_name)
 
     set_color_mode(use_colors)
+    stop_event = threading.Event()
+    error_event = threading.Event()
+    progress_thread = threading.Thread(target=display_progress_bar, args=(stop_event, error_event, package_name))
 
     if installed_version < latest_version:
         info(f"There is a new version of {package_name} available: {latest_version}.")
@@ -84,28 +97,25 @@ def upgrade_package(package_name, use_colors=True):
             f"Do you want to upgrade {package_name} from version {installed_version} to {latest_version}? (y/n): "
         )
         if answer.lower() == "y":
-            highlight(f"Upgrading {package_name}...")
-
-            # Create and start a progress bar in a separate thread
-            stop_progress = threading.Event()
-            progress_thread = threading.Thread(target=display_progress_bar, args=(stop_progress, package_name))
-            progress_thread.start()
 
             try:
                 # Try to use 'uv' if available, otherwise fallback to pip
                 try:
-                    subprocess.run(
+                    subprocess.check_call(
                         ["uv", "--version"],
-                        check=True,
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                     )
+                    highlight(f"Upgrading {package_name} using uv...\n")
                     use_uv = True
                 except Exception:
+                    highlight(f"Upgrading {package_name} using pip...\n")
                     use_uv = False
 
+                progress_thread.start()
+
                 if use_uv:
-                    subprocess.run(
+                    subprocess.check_call(
                         [
                             "uv",
                             "pip",
@@ -115,11 +125,9 @@ def upgrade_package(package_name, use_colors=True):
                             "--quiet",
                             "--disable-pip-version-check",
                         ],
-                        check=True,
-                        stderr=subprocess.DEVNULL,
                     )
                 else:
-                    subprocess.run(
+                    subprocess.check_call(
                         [
                             sys.executable,
                             "-m",
@@ -130,17 +138,19 @@ def upgrade_package(package_name, use_colors=True):
                             "--quiet",
                             "--disable-pip-version-check",
                         ],
-                        check=True,
-                        stderr=subprocess.DEVNULL,
                     )
-            finally:
-                # Stop the progress bar
-                stop_progress.set()
+                stop_event.set()
                 progress_thread.join()
+                success(f"{package_name} upgraded to version {latest_version}.")
+                info("Please restart your script.")
+                raise Exception("Upgrade completed.")
+            except subprocess.CalledProcessError as e:
+                error_event.set()
+                stop_event.set()
+                progress_thread.join()
+                error(f"Error: Failed to upgrade the package.")
+                raise Exception("Upgrade failed.")
 
-            success(f"\n{package_name} upgraded to version {latest_version}.")
-            info("Please restart your script.\n")
-            exit(0)
         else:
             info(f"{package_name} upgrade skipped.\n")
 

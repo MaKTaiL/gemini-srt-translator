@@ -1,11 +1,16 @@
 # GST Files
 *.srt
 traduzir.py
+translate.py
 *.progress
 *.log
 *.mp3
 *.mp4
 *.mkv
+
+# Claude Code
+.claude/
+CLAUDE.md
 
 # Virtual environment
 venv/
