@@ -452,11 +452,9 @@ class GeminiSRTTranslator:
     def getmodels(self):
         """Get available Gemini models that support content generation."""
         if not self.use_enterprise and not self.use_webapi and not self.current_api_key:
-            error("Please provide a valid Gemini API key.")
-            exit(1)
+            raise ValueError("Please provide a valid Gemini API key.")
         elif self.use_webapi and not self.secure_1psid and not self.browser:
-            error("Please provide a valid __Secure-1PSID cookie for Web API or use --browser argument.")
-            exit(1)
+            raise ValueError("Please provide a valid __Secure-1PSID cookie for Web API or use --browser argument.")
 
         client = self._get_client()
         
@@ -520,11 +518,9 @@ class GeminiSRTTranslator:
             self.srt_extracted = True
 
         if not self.use_enterprise and not self.use_webapi and not self.current_api_key:
-            error("Please provide a valid Gemini API key.", ignore_quiet=True)
-            exit(1)
+            raise ValueError("Please provide a valid Gemini API key.")
         elif self.use_webapi and not self.secure_1psid and not self.browser:
-            error("Please provide a valid __Secure-1PSID cookie for Web API or use --browser.", ignore_quiet=True)
-            exit(1)
+            raise ValueError("Please provide a valid __Secure-1PSID cookie for Web API or use --browser.")
 
         if not self.target_language:
             error("Please provide a target language.", ignore_quiet=True)
@@ -862,15 +858,28 @@ class GeminiSRTTranslator:
                     if self.audio:
                         audio_bytes = self.audio[offset * 1000 : offset_end * 1000].export(format="mp3").read()
                         if self.use_webapi:
-                            self.audio_part = audio_bytes
+                            import tempfile
+                            from pathlib import Path
+                            temp_audio = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+                            temp_audio.write(audio_bytes)
+                            temp_audio.close()
+                            self.audio_part = Path(temp_audio.name)
                         else:
                             self.audio_part = types.Part.from_bytes(data=audio_bytes, mime_type="audio/mp3")
 
                     start_time = time.time()
-                    if self.use_webapi:
-                        previous_message = self._process_batch_webapi(batch, previous_message, translated_subtitle)
-                    else:
-                        previous_message = self._process_batch(batch, previous_message, translated_subtitle)
+                    try:
+                        if self.use_webapi:
+                            previous_message = self._process_batch_webapi(batch, previous_message, translated_subtitle)
+                        else:
+                            previous_message = self._process_batch(batch, previous_message, translated_subtitle)
+                    finally:
+                        if self.use_webapi and self.audio_part and isinstance(self.audio_part, Path):
+                            try:
+                                self.audio_part.unlink(missing_ok=True)
+                            except Exception:
+                                pass
+                            self.audio_part = None
                     end_time = time.time()
                     offset = offset_end
 
@@ -1010,8 +1019,10 @@ class GeminiSRTTranslator:
                 self._webapi_client = WebAPIClientWrapper(self.secure_1psid, self.secure_1psidts, self.proxy, browser=self.browser)
                 return self._webapi_client
             except Exception as e:
-                error(f"Web API client failed to initialize: {e}\nHint: If using --browser, make sure you are logged into gemini.google.com in your default browser.", ignore_quiet=True)
-                exit(1)
+                raise RuntimeError(
+                    f"Web API client failed to initialize: {e}\n"
+                    "Hint: If using --browser, make sure you are logged into gemini.google.com in your default browser."
+                )
 
         if self.use_enterprise:
             if self.cloud_api_key:
@@ -1563,11 +1574,9 @@ class GeminiSRTTranslator:
             exit(1)
 
         if not self.use_enterprise and not self.use_webapi and not self.current_api_key:
-            error("Please provide a valid Gemini API key for transcription.", ignore_quiet=True)
-            exit(1)
+            raise ValueError("Please provide a valid Gemini API key for transcription.")
         elif self.use_webapi and not self.secure_1psid and not self.browser:
-            error("Please provide a valid __Secure-1PSID cookie for Web API transcription or use --browser.", ignore_quiet=True)
-            exit(1)
+            raise ValueError("Please provide a valid __Secure-1PSID cookie for Web API transcription or use --browser.")
 
         if "gemini" not in self.model_name or ("2.5" not in self.model_name and "3" not in self.model_name):
             error(
@@ -1666,338 +1675,352 @@ class GeminiSRTTranslator:
             while current_length < int(audio_length):
                 chunk_end = min(current_length + self.audio_chunk_size, int(audio_length))
                 audio_chunk = audio_file[current_length * 1000 : chunk_end * 1000].export(format="mp3").read()
-                if self.use_webapi:
-                    current_message = audio_chunk
-                else:
-                    audio_part = types.Part.from_bytes(data=audio_chunk, mime_type="audio/mp3")
-                    current_message = types.Content(role="user", parts=[audio_part])
-                progress_bar(
-                    current_length,
-                    audio_length,
-                    prefix="Transcribing:",
-                    suffix=(f"\033[31m{self.model_name}" if self.use_colors else f"{self.model_name}"),
-                    isSending=True,
-                    isTranscribing=True,
-                    token_stats=self.token_stats,
-                )
-                if self.use_colors:
-                    info_with_progress(
-                        f"Transcribing audio segment \033[93m{convert_timedelta_to_timestamp(timedelta(seconds=current_length))} \033[94mto \033[93m{convert_timedelta_to_timestamp(timedelta(seconds=chunk_end))}.",
-                        isTranscribing=True,
+                temp_audio_path = None
+                try:
+                    if self.use_webapi:
+                        import tempfile
+                        from pathlib import Path
+                        temp_audio = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+                        temp_audio.write(audio_chunk)
+                        temp_audio.close()
+                        current_message = Path(temp_audio.name)
+                        temp_audio_path = current_message
+                    else:
+                        audio_part = types.Part.from_bytes(data=audio_chunk, mime_type="audio/mp3")
+                        current_message = types.Content(role="user", parts=[audio_part])
+                    progress_bar(
+                        current_length,
+                        audio_length,
+                        prefix="Transcribing:",
+                        suffix=(f"\033[31m{self.model_name}" if self.use_colors else f"{self.model_name}"),
                         isSending=True,
-                    )
-                else:
-                    info_with_progress(
-                        f"Transcribing audio segment {convert_timedelta_to_timestamp(timedelta(seconds=current_length))} to {convert_timedelta_to_timestamp(timedelta(seconds=chunk_end))}.",
                         isTranscribing=True,
-                        isSending=True,
+                        token_stats=self.token_stats,
                     )
+                    if self.use_colors:
+                        info_with_progress(
+                            f"Transcribing audio segment \033[93m{convert_timedelta_to_timestamp(timedelta(seconds=current_length))} \033[94mto \033[93m{convert_timedelta_to_timestamp(timedelta(seconds=chunk_end))}.",
+                            isTranscribing=True,
+                            isSending=True,
+                        )
+                    else:
+                        info_with_progress(
+                            f"Transcribing audio segment {convert_timedelta_to_timestamp(timedelta(seconds=current_length))} to {convert_timedelta_to_timestamp(timedelta(seconds=chunk_end))}.",
+                            isTranscribing=True,
+                            isSending=True,
+                        )
 
-                max_retries = 3
-                server_error_retries = 0
-                chunk_processed_successfully = False
+                    max_retries = 3
+                    server_error_retries = 0
+                    chunk_processed_successfully = False
 
-                while not chunk_processed_successfully:
+                    while not chunk_processed_successfully:
 
-                    def _normalize_timestamp(ts_str: str) -> str:
-                        """Converts 'HH:MM:SS' back to the non-standard 'MM:SS' that the old utils expects."""
-                        parts = ts_str.split(":")
-                        if len(parts) == 3:
-                            try:
-                                h, m, s = map(int, parts)
-                                total_minutes = (h * 60) + m
-                                return f"{total_minutes:02}:{s:02}"
-                            except (ValueError, TypeError):
-                                return ts_str
-                        return ts_str
+                        def _normalize_timestamp(ts_str: str) -> str:
+                            """Converts 'HH:MM:SS' back to the non-standard 'MM:SS' that the old utils expects."""
+                            parts = ts_str.split(":")
+                            if len(parts) == 3:
+                                try:
+                                    h, m, s = map(int, parts)
+                                    total_minutes = (h * 60) + m
+                                    return f"{total_minutes:02}:{s:02}"
+                                except (ValueError, TypeError):
+                                    return ts_str
+                            return ts_str
 
-                    try:
-                        done = False
-                        retry = -1
-                        blocked = False
-                        done_thinking = False
-                        previous_prompt_tokens = 0
-                        previous_thoughts_tokens = 0
-                        previous_output_tokens = 0
-                        previous_total_tokens = 0
-                        processed_seconds = 0
-                        while not done:
-                            response_text = ""
-                            thoughts_text = ""
-                            retry += 1
-                            if not self.streaming:
-                                if self.use_webapi:
-                                    prompt = build_webapi_transcribe_prompt(
-                                        self.thinking,
-                                        True if self.thinking_level is not None else False,
-                                        str(current_message) if isinstance(current_message, dict) else "Audio chunk",
-                                        description=self.description,
-                                        is_continuation=index > 1
-                                    )
-                                    response = client.send_message(prompt, files=[current_message])
-                                    if not response.text:
-                                        raise ValueError("Gemini has returned an empty response.")
-                                    response_text = response.text
-                                    thoughts_text = response.thoughts or ""
-                                else:
-                                    response = client.models.generate_content(
-                                        model=self.model_name,
-                                        contents=[current_message],
-                                        config=self._get_transcribe_config(),
-                                    )
-                                    if response.prompt_feedback:
-                                        blocked = True
-                                        break
-                                    if not response.text:
-                                        raise ValueError("Gemini has returned an empty response.")
-                                    for part in response.candidates[0].content.parts:
-                                        if not part.text:
-                                            continue
-                                        elif part.thought:
-                                            thoughts_text += part.text
-                                            continue
-                                        else:
-                                            response_text += part.text
-                                            
-                                if self.thoughts_log and self.thinking:
-                                    if retry == 0:
-                                        info_with_progress(
-                                            f"Batch {self.batch_number} thinking process saved to file.",
-                                            isTranscribing=True,
+                        try:
+                            done = False
+                            retry = -1
+                            blocked = False
+                            done_thinking = False
+                            previous_prompt_tokens = 0
+                            previous_thoughts_tokens = 0
+                            previous_output_tokens = 0
+                            previous_total_tokens = 0
+                            processed_seconds = 0
+                            while not done:
+                                response_text = ""
+                                thoughts_text = ""
+                                retry += 1
+                                if not self.streaming:
+                                    if self.use_webapi:
+                                        prompt = build_webapi_transcribe_prompt(
+                                            self.thinking,
+                                            True if self.thinking_level is not None else False,
+                                            str(current_message) if isinstance(current_message, dict) else "Audio chunk",
+                                            description=self.description,
+                                            is_continuation=index > 1
                                         )
+                                        response = client.send_message(prompt, files=[current_message])
+                                        if not response.text:
+                                            raise ValueError("Gemini has returned an empty response.")
+                                        response_text = response.text
+                                        thoughts_text = response.thoughts or ""
                                     else:
-                                        info_with_progress(
-                                            f"Batch {self.batch_number}.{retry} thinking process saved to file.",
-                                            isTranscribing=True,
+                                        response = client.models.generate_content(
+                                            model=self.model_name,
+                                            contents=[current_message],
+                                            config=self._get_transcribe_config(),
                                         )
-                                    save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
-                                update_loading_animation(
-                                    chunk_size=processed_seconds if processed_seconds else 0,
-                                    isTranscribing=True,
-                                    isThinking=self.thinking and not done_thinking,
-                                    token_stats=self.token_stats,
-                                    prompt_tokens=response.usage_metadata.prompt_token_count,
-                                    thoughts_tokens=response.usage_metadata.thoughts_token_count,
-                                    output_tokens=response.usage_metadata.candidates_token_count,
-                                    total_tokens=response.usage_metadata.total_token_count,
-                                )
-                            else:
-                                if blocked:
-                                    break
-                                
-                                if self.use_webapi:
-                                    prompt = build_webapi_transcribe_prompt(
-                                        self.thinking,
-                                        True if self.thinking_level is not None else False,
-                                        str(current_message) if isinstance(current_message, dict) else "Audio chunk",
-                                        description=self.description,
-                                        is_continuation=index > 1
-                                    )
-                                    response_stream = client.send_message_stream(prompt, files=[current_message])
-                                    for chunk in response_stream:
-                                        if chunk.thoughts_delta:
-                                            update_loading_animation(chunk_size=0, isThinking=True, isTranscribing=True)
-                                            thoughts_text += chunk.thoughts_delta
-                                        if chunk.text_delta:
-                                            if not done_thinking and self.thoughts_log and self.thinking and thoughts_text:
-                                                if retry == 0:
-                                                    info_with_progress(f"Batch {self.batch_number} thinking process saved to file.", isTranscribing=True)
-                                                else:
-                                                    info_with_progress(f"Batch {self.batch_number}.{retry} thinking process saved to file.", isTranscribing=True)
-                                                save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
-                                                done_thinking = True
-                                            response_text += chunk.text_delta
-                                            transcription_json = json_repair.loads(
-                                                response_text, stream_stable=True
-                                            )
-                                            if not isinstance(transcription_json, list) or not all(
-                                                isinstance(item, dict) for item in transcription_json
-                                            ):
-                                                transcription_json = self._flatten_repaired_json(transcription_json)
-                                            if len(transcription_json) > 1:
-                                                if "time_end" in transcription_json[-2]:
-                                                    ts_for_anim = _normalize_timestamp(transcription_json[-2]["time_end"])
-                                                    processed_seconds = convert_timestamp_to_timedelta(ts_for_anim).total_seconds()
-                                                    update_loading_animation(int(processed_seconds), isTranscribing=True)
-                                else:
-                                    response = client.models.generate_content_stream(
-                                        model=self.model_name,
-                                        contents=[current_message],
-                                        config=self._get_transcribe_config(),
-                                    )
-                                    for chunk in response:
-                                        if chunk.prompt_feedback:
+                                        if response.prompt_feedback:
                                             blocked = True
                                             break
-                                        if chunk.candidates[0].content.parts:
-                                            for part in chunk.candidates[0].content.parts:
-                                                if not part.text:
-                                                    continue
-                                                if part.thought:
-                                                    thoughts_text += part.text
-                                                    update_loading_animation(
-                                                        chunk_size=0, isThinking=True, isTranscribing=True
-                                                    )
-                                                else:
-                                                    if not done_thinking:
-                                                        done_thinking = True
-                                                        if self.thoughts_log and self.thinking:
-                                                            if retry == 0:
-                                                                info_with_progress(
-                                                                    f"Batch {self.batch_number} thinking process saved to file.",
-                                                                    isTranscribing=True,
-                                                                )
-                                                            else:
-                                                                info_with_progress(
-                                                                    f"Batch {self.batch_number}.{retry} thinking process saved to file.",
-                                                                    isTranscribing=True,
-                                                                )
-                                                            save_thoughts_to_file(
-                                                                thoughts_text,
-                                                                self.thoughts_file_path,
-                                                                retry,
-                                                            )
-                                                    response_text += part.text
-                                                    transcription_json = json_repair.loads(
-                                                        response_text, stream_stable=True
-                                                    )
-                                                    if not isinstance(transcription_json, list) or not all(
-                                                        isinstance(item, dict) for item in transcription_json
-                                                    ):
-                                                        transcription_json = self._flatten_repaired_json(transcription_json)
-                                                    if len(transcription_json) > 1:
-                                                        if "time_end" in transcription_json[-2]:
-                                                            ts_for_anim = _normalize_timestamp(
-                                                                transcription_json[-2]["time_end"]
-                                                            )
-                                                            processed_seconds = convert_timestamp_to_timedelta(
-                                                                ts_for_anim
-                                                            ).total_seconds()
-
-                                            update_loading_animation(
-                                                chunk_size=processed_seconds if processed_seconds else 0,
+                                        if not response.text:
+                                            raise ValueError("Gemini has returned an empty response.")
+                                        for part in response.candidates[0].content.parts:
+                                            if not part.text:
+                                                continue
+                                            elif part.thought:
+                                                thoughts_text += part.text
+                                                continue
+                                            else:
+                                                response_text += part.text
+                                                
+                                    if self.thoughts_log and self.thinking:
+                                        if retry == 0:
+                                            info_with_progress(
+                                                f"Batch {self.batch_number} thinking process saved to file.",
                                                 isTranscribing=True,
-                                                isThinking=self.thinking and not done_thinking,
-                                                token_stats=self.token_stats,
-                                                prompt_tokens=(
-                                                    chunk.usage_metadata.prompt_token_count - previous_prompt_tokens
+                                            )
+                                        else:
+                                            info_with_progress(
+                                                f"Batch {self.batch_number}.{retry} thinking process saved to file.",
+                                                isTranscribing=True,
+                                            )
+                                        save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
+                                    update_loading_animation(
+                                        chunk_size=processed_seconds if processed_seconds else 0,
+                                        isTranscribing=True,
+                                        isThinking=self.thinking and not done_thinking,
+                                        token_stats=self.token_stats,
+                                        prompt_tokens=response.usage_metadata.prompt_token_count,
+                                        thoughts_tokens=response.usage_metadata.thoughts_token_count,
+                                        output_tokens=response.usage_metadata.candidates_token_count,
+                                        total_tokens=response.usage_metadata.total_token_count,
+                                    )
+                                else:
+                                    if blocked:
+                                        break
+                                    
+                                    if self.use_webapi:
+                                        prompt = build_webapi_transcribe_prompt(
+                                            self.thinking,
+                                            True if self.thinking_level is not None else False,
+                                            str(current_message) if isinstance(current_message, dict) else "Audio chunk",
+                                            description=self.description,
+                                            is_continuation=index > 1
+                                        )
+                                        response_stream = client.send_message_stream(prompt, files=[current_message])
+                                        for chunk in response_stream:
+                                            if chunk.thoughts_delta:
+                                                update_loading_animation(chunk_size=0, isThinking=True, isTranscribing=True)
+                                                thoughts_text += chunk.thoughts_delta
+                                            if chunk.text_delta:
+                                                if not done_thinking and self.thoughts_log and self.thinking and thoughts_text:
+                                                    if retry == 0:
+                                                        info_with_progress(f"Batch {self.batch_number} thinking process saved to file.", isTranscribing=True)
+                                                    else:
+                                                        info_with_progress(f"Batch {self.batch_number}.{retry} thinking process saved to file.", isTranscribing=True)
+                                                    save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
+                                                    done_thinking = True
+                                                response_text += chunk.text_delta
+                                                transcription_json = json_repair.loads(
+                                                    response_text, stream_stable=True
+                                                )
+                                                if not isinstance(transcription_json, list) or not all(
+                                                    isinstance(item, dict) for item in transcription_json
+                                                ):
+                                                    transcription_json = self._flatten_repaired_json(transcription_json)
+                                                if len(transcription_json) > 1:
+                                                    if "time_end" in transcription_json[-2]:
+                                                        ts_for_anim = _normalize_timestamp(transcription_json[-2]["time_end"])
+                                                        processed_seconds = convert_timestamp_to_timedelta(ts_for_anim).total_seconds()
+                                                        update_loading_animation(int(processed_seconds), isTranscribing=True)
+                                    else:
+                                        response = client.models.generate_content_stream(
+                                            model=self.model_name,
+                                            contents=[current_message],
+                                            config=self._get_transcribe_config(),
+                                        )
+                                        for chunk in response:
+                                            if chunk.prompt_feedback:
+                                                blocked = True
+                                                break
+                                            if chunk.candidates[0].content.parts:
+                                                for part in chunk.candidates[0].content.parts:
+                                                    if not part.text:
+                                                        continue
+                                                    if part.thought:
+                                                        thoughts_text += part.text
+                                                        update_loading_animation(
+                                                            chunk_size=0, isThinking=True, isTranscribing=True
+                                                        )
+                                                    else:
+                                                        if not done_thinking:
+                                                            done_thinking = True
+                                                            if self.thoughts_log and self.thinking:
+                                                                if retry == 0:
+                                                                    info_with_progress(
+                                                                        f"Batch {self.batch_number} thinking process saved to file.",
+                                                                        isTranscribing=True,
+                                                                    )
+                                                                else:
+                                                                    info_with_progress(
+                                                                        f"Batch {self.batch_number}.{retry} thinking process saved to file.",
+                                                                        isTranscribing=True,
+                                                                    )
+                                                                save_thoughts_to_file(
+                                                                    thoughts_text,
+                                                                    self.thoughts_file_path,
+                                                                    retry,
+                                                                )
+                                                        response_text += part.text
+                                                        transcription_json = json_repair.loads(
+                                                            response_text, stream_stable=True
+                                                        )
+                                                        if not isinstance(transcription_json, list) or not all(
+                                                            isinstance(item, dict) for item in transcription_json
+                                                        ):
+                                                            transcription_json = self._flatten_repaired_json(transcription_json)
+                                                        if len(transcription_json) > 1:
+                                                            if "time_end" in transcription_json[-2]:
+                                                                ts_for_anim = _normalize_timestamp(
+                                                                    transcription_json[-2]["time_end"]
+                                                                )
+                                                                processed_seconds = convert_timestamp_to_timedelta(
+                                                                    ts_for_anim
+                                                                ).total_seconds()
+
+                                                update_loading_animation(
+                                                    chunk_size=processed_seconds if processed_seconds else 0,
+                                                    isTranscribing=True,
+                                                    isThinking=self.thinking and not done_thinking,
+                                                    token_stats=self.token_stats,
+                                                    prompt_tokens=(
+                                                        chunk.usage_metadata.prompt_token_count - previous_prompt_tokens
+                                                        if chunk.usage_metadata and chunk.usage_metadata.prompt_token_count
+                                                        else None
+                                                    ),
+                                                    thoughts_tokens=(
+                                                        chunk.usage_metadata.thoughts_token_count - previous_thoughts_tokens
+                                                        if chunk.usage_metadata and chunk.usage_metadata.thoughts_token_count
+                                                        else None
+                                                    ),
+                                                    output_tokens=(
+                                                        chunk.usage_metadata.candidates_token_count - previous_output_tokens
+                                                        if chunk.usage_metadata and chunk.usage_metadata.candidates_token_count
+                                                        else None
+                                                    ),
+                                                    total_tokens=(
+                                                        chunk.usage_metadata.total_token_count - previous_total_tokens
+                                                        if chunk.usage_metadata and chunk.usage_metadata.total_token_count
+                                                        else None
+                                                    ),
+                                                )
+                                                previous_prompt_tokens = (
+                                                    chunk.usage_metadata.prompt_token_count
                                                     if chunk.usage_metadata and chunk.usage_metadata.prompt_token_count
-                                                    else None
-                                                ),
-                                                thoughts_tokens=(
-                                                    chunk.usage_metadata.thoughts_token_count - previous_thoughts_tokens
+                                                    else 0
+                                                )
+                                                previous_thoughts_tokens = (
+                                                    chunk.usage_metadata.thoughts_token_count
                                                     if chunk.usage_metadata and chunk.usage_metadata.thoughts_token_count
-                                                    else None
-                                                ),
-                                                output_tokens=(
-                                                    chunk.usage_metadata.candidates_token_count - previous_output_tokens
+                                                    else 0
+                                                )
+                                                previous_output_tokens = (
+                                                    chunk.usage_metadata.candidates_token_count
                                                     if chunk.usage_metadata and chunk.usage_metadata.candidates_token_count
-                                                    else None
-                                                ),
-                                                total_tokens=(
-                                                    chunk.usage_metadata.total_token_count - previous_total_tokens
+                                                    else 0
+                                                )
+                                                previous_total_tokens = (
+                                                    chunk.usage_metadata.total_token_count
                                                     if chunk.usage_metadata and chunk.usage_metadata.total_token_count
-                                                    else None
-                                                ),
-                                            )
-                                            previous_prompt_tokens = (
-                                                chunk.usage_metadata.prompt_token_count
-                                                if chunk.usage_metadata and chunk.usage_metadata.prompt_token_count
-                                                else 0
-                                            )
-                                            previous_thoughts_tokens = (
-                                                chunk.usage_metadata.thoughts_token_count
-                                                if chunk.usage_metadata and chunk.usage_metadata.thoughts_token_count
-                                                else 0
-                                            )
-                                            previous_output_tokens = (
-                                                chunk.usage_metadata.candidates_token_count
-                                                if chunk.usage_metadata and chunk.usage_metadata.candidates_token_count
-                                                else 0
-                                            )
-                                            previous_total_tokens = (
-                                                chunk.usage_metadata.total_token_count
-                                                if chunk.usage_metadata and chunk.usage_metadata.total_token_count
-                                                else 0
-                                            )
+                                                    else 0
+                                                )
 
-                            if blocked:
-                                raise Exception("Content blocked by the API.")
+                                if blocked:
+                                    raise Exception("Content blocked by the API.")
 
-                            transcription_json = json_repair.loads(response_text)
-                            if not isinstance(transcription_json, list) or not all(
-                                isinstance(item, dict) for item in transcription_json
-                            ):
-                                transcription_json = self._flatten_repaired_json(transcription_json)
+                                transcription_json = json_repair.loads(response_text)
+                                if not isinstance(transcription_json, list) or not all(
+                                    isinstance(item, dict) for item in transcription_json
+                                ):
+                                    transcription_json = self._flatten_repaired_json(transcription_json)
 
-                            for i in range(len(transcription_json)):
-                                start_ts = _normalize_timestamp(transcription_json[i]["time_start"])
-                                end_ts = _normalize_timestamp(transcription_json[i]["time_end"])
-                                subtitle_kwargs = {
-                                    "index": str(index),
-                                    "content": transcription_json[i]["text"],
-                                    "start": convert_timestamp_to_timedelta(start_ts, offset=current_length),
-                                    "end": convert_timestamp_to_timedelta(end_ts, offset=current_length),
-                                }
-                                if self._dominant_strong_direction(subtitle_kwargs["content"]) == "rtl":
-                                    subtitle_kwargs["content"] = f"\u202b{subtitle_kwargs['content']}\u202c"
-                                transcribed_subtitle_objects.append(Subtitle(**subtitle_kwargs))
-                                index += 1
+                                for i in range(len(transcription_json)):
+                                    start_ts = _normalize_timestamp(transcription_json[i]["time_start"])
+                                    end_ts = _normalize_timestamp(transcription_json[i]["time_end"])
+                                    subtitle_kwargs = {
+                                        "index": str(index),
+                                        "content": transcription_json[i]["text"],
+                                        "start": convert_timestamp_to_timedelta(start_ts, offset=current_length),
+                                        "end": convert_timestamp_to_timedelta(end_ts, offset=current_length),
+                                    }
+                                    if self._dominant_strong_direction(subtitle_kwargs["content"]) == "rtl":
+                                        subtitle_kwargs["content"] = f"\u202b{subtitle_kwargs['content']}\u202c"
+                                    transcribed_subtitle_objects.append(Subtitle(**subtitle_kwargs))
+                                    index += 1
 
-                            done = True
+                                done = True
 
-                        chunk_processed_successfully = True
+                            chunk_processed_successfully = True
 
-                    except Exception as e:
-                        e_str = str(e).lower()
+                        except Exception as e:
+                            e_str = str(e).lower()
 
-                        if "quota" in e_str:
-                            current_time = time.time()
-                            if current_time - last_time > 60 and self._switch_api():
-                                highlight_with_progress(
-                                    f"API {self.backup_api_number} quota exceeded! Switching to API {self.current_api_number}...",
-                                    isSending=True,
-                                )
-                            else:
-                                for j in range(60, 0, -1):
-                                    warning_with_progress(f"All API quotas exceeded, waiting {j} seconds...")
-                                    time.sleep(1)
-                            last_time = current_time
-                            continue
-
-                        elif any(err in e_str for err in ["429", "500", "503", "unavailable", "overloaded"]):
-                            server_error_retries += 1
-                            if server_error_retries < max_retries:
-                                warning_with_progress(
-                                    f"Model is overloaded. Attempt {server_error_retries + 1}/{max_retries}. Pausing for 60 seconds...",
-                                    isTranscribing=True,
-                                )
-                                time.sleep(60)
+                            if "quota" in e_str:
+                                current_time = time.time()
+                                if current_time - last_time > 60 and self._switch_api():
+                                    highlight_with_progress(
+                                        f"API {self.backup_api_number} quota exceeded! Switching to API {self.current_api_number}...",
+                                        isSending=True,
+                                    )
+                                else:
+                                    for j in range(60, 0, -1):
+                                        warning_with_progress(f"All API quotas exceeded, waiting {j} seconds...")
+                                        time.sleep(1)
+                                last_time = current_time
                                 continue
+
+                            elif any(err in e_str for err in ["429", "500", "503", "unavailable", "overloaded"]):
+                                server_error_retries += 1
+                                if server_error_retries < max_retries:
+                                    warning_with_progress(
+                                        f"Model is overloaded. Attempt {server_error_retries + 1}/{max_retries}. Pausing for 60 seconds...",
+                                        isTranscribing=True,
+                                    )
+                                    time.sleep(60)
+                                    continue
+                                else:
+                                    error_with_progress(
+                                        f"Failed to process segment after multiple retries. Aborting...",
+                                        isTranscribing=True,
+                                    )
+                                    raise e
+
                             else:
-                                error_with_progress(
-                                    f"Failed to process segment after multiple retries. Aborting...",
+                                warning_with_progress(
+                                    f"An unexpected error occurred: {e_str}. Retrying immediately...",
                                     isTranscribing=True,
                                 )
-                                raise e
+                                time.sleep(1)
+                                continue
 
-                        else:
-                            warning_with_progress(
-                                f"An unexpected error occurred: {e_str}. Retrying immediately...",
-                                isTranscribing=True,
-                            )
-                            time.sleep(1)
-                            continue
+                    server_error_retries = 0
 
-                server_error_retries = 0
+                    current_length = chunk_end
+                    last_saved_time = current_length
+                    self._save_transcribe_progress(current_length)
+                    self.batch_number += 1
+                    if self.progress_log:
+                        save_logs_to_file(self.log_file_path)
 
-                current_length = chunk_end
-                last_saved_time = current_length
-                self._save_transcribe_progress(current_length)
-                self.batch_number += 1
-                if self.progress_log:
-                    save_logs_to_file(self.log_file_path)
-
+                finally:
+                    if temp_audio_path and isinstance(temp_audio_path, Path):
+                        try:
+                            temp_audio_path.unlink(missing_ok=True)
+                        except Exception:
+                            pass
             transcribed_subtitle = srt.compose(transcribed_subtitle_objects)
             progress_bar(
                 audio_length,

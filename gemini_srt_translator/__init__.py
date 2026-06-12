@@ -106,7 +106,14 @@ def getmodels():
         except Exception:
             exit(0)
 
-    translator = GeminiSRTTranslator(gemini_api_key=gemini_api_key)
+    translator = GeminiSRTTranslator(
+        gemini_api_key=gemini_api_key,
+        use_webapi=use_webapi,
+        secure_1psid=secure_1psid,
+        secure_1psidts=secure_1psidts,
+        proxy=proxy,
+        browser=browser,
+    )
     return translator.getmodels()
 
 
@@ -142,6 +149,11 @@ def listmodels():
         cloud_api_key=cloud_api_key,
         cloud_project=cloud_project,
         cloud_location=cloud_location,
+        use_webapi=use_webapi,
+        secure_1psid=secure_1psid,
+        secure_1psidts=secure_1psidts,
+        proxy=proxy,
+        browser=browser,
     )
     models = translator.getmodels()
     if models:
