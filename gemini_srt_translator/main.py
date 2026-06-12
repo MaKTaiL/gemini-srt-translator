@@ -1377,6 +1377,10 @@ class GeminiSRTTranslator:
                     save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
                     
                 self.translated_batch = json_repair.loads(response_text)
+                if not isinstance(self.translated_batch, list) or not all(
+                    isinstance(item, dict) for item in self.translated_batch
+                ):
+                    self.translated_batch = self._flatten_repaired_json(self.translated_batch)
             else:
                 response_stream = client.send_message_stream(prompt, files=files)
                 for chunk in response_stream:
@@ -1394,7 +1398,13 @@ class GeminiSRTTranslator:
                             done_thinking = True
                             
                         response_text += chunk.text_delta
-                        self.translated_batch = json_repair.loads(response_text)
+                        self.translated_batch = json_repair.loads(
+                            response_text, stream_stable=True
+                        )
+                        if not isinstance(self.translated_batch, list) or not all(
+                            isinstance(item, dict) for item in self.translated_batch
+                        ):
+                            self.translated_batch = self._flatten_repaired_json(self.translated_batch)
                         
                     chunk_size = len(self.translated_batch)
                     if chunk_size > 0:
@@ -1797,7 +1807,13 @@ class GeminiSRTTranslator:
                                                 save_thoughts_to_file(thoughts_text, self.thoughts_file_path, retry)
                                                 done_thinking = True
                                             response_text += chunk.text_delta
-                                            transcription_json = json_repair.loads(response_text)
+                                            transcription_json = json_repair.loads(
+                                                response_text, stream_stable=True
+                                            )
+                                            if not isinstance(transcription_json, list) or not all(
+                                                isinstance(item, dict) for item in transcription_json
+                                            ):
+                                                transcription_json = self._flatten_repaired_json(transcription_json)
                                             if len(transcription_json) > 1:
                                                 if "time_end" in transcription_json[-2]:
                                                     ts_for_anim = _normalize_timestamp(transcription_json[-2]["time_end"])
