@@ -41,3 +41,6 @@ gst = "gemini_srt_translator.cli:main"
 webapi = [
   "gemini-webapi>=1.1.2"
 ]
+
+[tool.setuptools]
+packages = ["gemini_srt_translator"]

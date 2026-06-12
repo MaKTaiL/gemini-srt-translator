@@ -61,6 +61,11 @@ class WebAPIClientWrapper:
                     "Install it with: pip install browser_cookie3 or pip install gemini-webapi[browser]"
                 )
             secure_1psid, secure_1psidts = self._extract_cookies_manually(browser_cookie3)
+            if not secure_1psid:
+                raise ValueError(
+                    "Could not extract __Secure-1PSID cookie from any local browser. "
+                    "Make sure you are logged into gemini.google.com in Chrome, Firefox, Edge, Opera, Brave, or Chromium."
+                )
 
         # Create a dedicated event loop running in a daemon thread.
         self._loop = asyncio.new_event_loop()
