@@ -122,6 +122,9 @@ def extract_audio_from_video(video_path, isolate_voice=False, target_mb=20):
                         ]
                     )
 
+        # Sync audio to container timestamps to avoid progressive drift
+        filters.append("aresample=async=1")
+
         # --- Extract to Temporary WAV File ---
         info("Step 2: Extracting audio to a temporary WAV file...")
         extract_cmd = [
