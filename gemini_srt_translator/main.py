@@ -83,7 +83,7 @@ class GeminiSRTTranslator:
         output_file: str = None,
         video_file: str = None,
         audio_file: str = None,
-        audio_chunk_size: int = 600,
+        audio_chunk_size: int = 300,
         extract_audio: bool = False,
         isolate_voice: bool = True,
         start_line: int = None,

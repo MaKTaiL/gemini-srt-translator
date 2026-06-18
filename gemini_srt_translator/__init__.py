@@ -368,8 +368,6 @@ def extract(type: Literal["audio", "srt"]):
         "use_colors": use_colors,
     }
 
-    if params["isolate_voice"] is None:
-        params["isolate_voice"] = False
     filtered_params = {k: v for k, v in params.items() if v is not None}
     translator = GeminiSRTTranslator(**filtered_params)
     if type == "audio":
@@ -444,9 +442,6 @@ def transcribe():
         "thoughts_log": thoughts_log,
         "resume": resume,
     }
-
-    if params["isolate_voice"] is None:
-        params["isolate_voice"] = False
 
     filtered_params = {k: v for k, v in params.items() if v is not None}
     translator = GeminiSRTTranslator(**filtered_params)
