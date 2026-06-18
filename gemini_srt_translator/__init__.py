@@ -72,6 +72,11 @@ progress_log: bool = None
 thoughts_log: bool = None
 quiet: bool = None
 resume: bool = None
+use_webapi: bool = False
+secure_1psid: str = None
+secure_1psidts: str = None
+proxy: str = None
+browser: bool = False
 
 
 def getmodels():
@@ -101,7 +106,14 @@ def getmodels():
         except Exception:
             exit(0)
 
-    translator = GeminiSRTTranslator(gemini_api_key=gemini_api_key)
+    translator = GeminiSRTTranslator(
+        gemini_api_key=gemini_api_key,
+        use_webapi=use_webapi,
+        secure_1psid=secure_1psid,
+        secure_1psidts=secure_1psidts,
+        proxy=proxy,
+        browser=browser,
+    )
     return translator.getmodels()
 
 
@@ -137,6 +149,11 @@ def listmodels():
         cloud_api_key=cloud_api_key,
         cloud_project=cloud_project,
         cloud_location=cloud_location,
+        use_webapi=use_webapi,
+        secure_1psid=secure_1psid,
+        secure_1psidts=secure_1psidts,
+        proxy=proxy,
+        browser=browser,
     )
     models = translator.getmodels()
     if models:
@@ -314,6 +331,11 @@ def translate():
         "progress_log": progress_log,
         "thoughts_log": thoughts_log,
         "resume": resume,
+        "use_webapi": use_webapi,
+        "secure_1psid": secure_1psid,
+        "secure_1psidts": secure_1psidts,
+        "proxy": proxy,
+        "browser": browser,
     }
 
     if quiet:
@@ -441,6 +463,11 @@ def transcribe():
         "use_colors": use_colors,
         "thoughts_log": thoughts_log,
         "resume": resume,
+        "use_webapi": use_webapi,
+        "secure_1psid": secure_1psid,
+        "secure_1psidts": secure_1psidts,
+        "proxy": proxy,
+        "browser": browser,
     }
 
     filtered_params = {k: v for k, v in params.items() if v is not None}

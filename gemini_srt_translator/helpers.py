@@ -61,13 +61,36 @@ def get_translate_instruction(
 - **Translate Text Only**: Only translate the value of the `text` field.
 - **Preserve Formatting**: Keep all existing formatting, including HTML tags (`<i>`, `<b>`) and line breaks (`\\n`).
 - **Handle Empty Text**: If a `text` field is empty or contains only whitespace, keep it unchanged.
-- **Maintain Integrity**:
+- **Strict Mapping and Integrity**:
   - Number of items in the output must match the input.
   - **Do NOT** alter any fields other than `text`.
-  - **Do NOT** add, remove, or reorder any items on the list.
-  - **Do NOT** merge text between different items. Original and translation must match.
+  - **Do NOT** add, remove, or reorder any items on the list. Each `index` in the input must have a corresponding `index` in the output.
+  - **Do NOT** merge separate items into one, even if they form a single sentence. Each fragment must be translated individually within its original item. If a sentence spans across multiple items, distribute the translation accordingly.
+- **No Empty Responses**: If the input `text` is not empty, the output `text` MUST NOT be empty. If an item contains only a filler or a fragment that is hard to translate in isolation, provide a meaningful translation or a placeholder that maintains the timing (e.g., an ellipsis `...`), but never return an empty string.
 """
     prompt_parts.append(core_rules)
+
+    # --- Section 4: Few-Shot Example for Split Sentences ---
+    section_number += 1
+    split_example = f"""
+## {section_number}. Example of Handling Split Sentences
+If the input is:
+```json
+[
+  {{ "index": "54", "text": "you're running a process in that single" }},
+  {{ "index": "55", "text": "address space uh" }}
+]
+```
+The output should be:
+```json
+[
+  {{ "index": "54", "text": "bu tek" }},
+  {{ "index": "55", "text": "adres alanı" }}
+]
+```
+Note how the translation is distributed across both lines to maintain the 1:1 mapping.
+"""
+    prompt_parts.append(split_example)
 
     # --- Section 4: Advanced Rules (Conditional) ---
     if audio_file:
@@ -284,6 +307,112 @@ def get_transcribe_response_schema() -> types.Schema:
             required=["text", "time_start", "time_end"],
         ),
     )
+
+
+# ==============================================================================
+# WEB API PROMPT BUILDERS
+# ==============================================================================
+
+def get_webapi_translate_system_prompt(
+    language: str,
+    thinking: bool,
+    thinking_compatible: bool,
+    audio_file: Optional[str] = None,
+    description: Optional[str] = None,
+) -> str:
+    """
+    Builds the system instruction equivalent for the Gemini Web API chat session.
+    """
+    instruction = get_translate_instruction(
+        language, thinking, thinking_compatible, audio_file, description
+    )
+    
+    prompt = f"{instruction}\n\n"
+    prompt += "CRITICAL: You MUST respond with ONLY a valid JSON array, strictly adhering to the requested schema. Do NOT wrap the JSON in Markdown formatting (```json ... ```) or provide any other conversational text.\n"
+    prompt += "CRITICAL: DO NOT merge or drop any items! You must return the EXACT same number of items as provided in the input batch. Maintain all indexes.\n\n"
+    prompt += "Acknowledge these instructions and wait for the very first batch."
+    
+    return prompt
+
+def build_webapi_translate_prompt(
+    language: str,
+    thinking: bool,
+    thinking_compatible: bool,
+    current_batch: str,
+    previous_context: Optional[str] = None,
+    audio_file: Optional[str] = None,
+    description: Optional[str] = None,
+    is_continuation: bool = True,
+) -> str:
+    """
+    Builds the iterative prompt string for the Gemini Web API combining instructions,
+    context, and the actual batch data.
+    """
+    instruction = get_translate_instruction(
+        language, thinking, thinking_compatible, audio_file, description
+    )
+    
+    prompt = f"{instruction}\n\n"
+    if is_continuation:
+        prompt += "⚠️ CONTINUATION NOTICE: You are currently translating a very long subtitle file in parts. This is NOT the start of the file. Maintain terminology and tone consistency with previous sections. Do NOT skip any lines.\n\n"
+        
+    prompt += "🛑 STRICT JSON SCHEMA FOR WEB API:\n"
+    prompt += "Your entire output MUST be a JSON array of objects. NO conversational filler, NO Markdown (```json). \n"
+    prompt += "EXACT format per item:\n"
+    prompt += ' { "index": "...", "text": "..." }\n\n'
+    prompt += "1. NEVER change the key names. Use ONLY lowercase \"index\" and \"text\".\n"
+    prompt += "2. You MUST return the EXACT same number of items as given in the input.\n"
+    prompt += "3. DO NOT MERGE fragments. If a sentence is split, translate each part in its own item.\n"
+    prompt += "4. NO item should have an empty \"text\" (unless input was empty).\n"
+    prompt += "5. DO NOT escape Turkish characters (ç, ş, ğ, ü, ö, ı). Return them as literal characters.\n\n"
+    
+    if previous_context:
+        prompt += f"--- PREVIOUS CONTEXT (For reference only, DO NOT translate these) ---\n{previous_context}\n\n"
+        
+    prompt += f"--- TRANSLATION TASK (Translate to {language}) ---\n{current_batch}"
+    return prompt
+
+
+def get_webapi_transcribe_system_prompt(
+    thinking: bool,
+    thinking_compatible: bool,
+    description: Optional[str] = None,
+) -> str:
+    """
+    Builds the system instruction equivalent for the Gemini Web API transcription session.
+    """
+    instruction = get_transcribe_instruction(thinking, thinking_compatible, description)
+    
+    prompt = f"{instruction}\n\n"
+    prompt += "CRITICAL: You MUST respond with ONLY a valid JSON array, strictly adhering to the requested schema. Do NOT wrap the JSON in Markdown formatting (```json ... ```) or provide any other conversational text.\n"
+    prompt += "Acknowledge these instructions and wait for the very first audio or text chunks."
+    
+    return prompt
+
+def build_webapi_transcribe_prompt(
+    thinking: bool,
+    thinking_compatible: bool,
+    current_batch: str,
+    description: Optional[str] = None,
+    is_continuation: bool = True,
+) -> str:
+    """
+    Builds the iterative prompt string for the Web API transcription.
+    """
+    instruction = get_transcribe_instruction(thinking, thinking_compatible, description)
+    
+    prompt = f"{instruction}\n\n"
+    if is_continuation:
+        prompt += "⚠️ CONTINUATION NOTICE: You are currently transcribing a long audio file in parts. This is NOT the start of the file. Maintain terminology and tone consistency with previous sections.\n\n"
+        
+    prompt += "🛑 CRITICAL RULES FOR WEB API:\n"
+    prompt += "1. You MUST respond with ONLY a valid JSON array. No markdown, no conversational filler.\n"
+    prompt += "2. DO NOT MERGE segments. Do NOT return an empty string for the 'text' field unless the input was silent.\n"
+    prompt += "3. Response structure: [ { \"text\": \"...\", \"time_start\": \"...\", \"time_end\": \"...\" } ]\n\n"
+    
+    prompt += "--- TRANSCRIBE THIS AUDIO / TEXT BATCH ---\n"
+    prompt += current_batch + "\n"
+    return prompt
 
 
 # ==============================================================================

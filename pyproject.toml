@@ -36,3 +36,11 @@ requires-python = ">=3.10"
 [project.scripts]
 gemini-srt-translator = "gemini_srt_translator.cli:main"
 gst = "gemini_srt_translator.cli:main"
+
+[project.optional-dependencies]
+webapi = [
+  "gemini-webapi>=1.1.2"
+]
+
+[tool.setuptools]
+packages = ["gemini_srt_translator"]
