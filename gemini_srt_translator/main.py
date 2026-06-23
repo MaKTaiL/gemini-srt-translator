@@ -6,7 +6,7 @@ import time
 import typing
 import unicodedata as ud
 from collections import Counter
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Literal
 
 import json_repair
@@ -96,6 +96,7 @@ class GeminiSRTTranslator:
         thinking_level: Literal["minimal", "low", "medium", "high"] = None,
         service_tier: Literal["standard", "flex", "priority"] = None,
         token_stats: bool = False,
+        token_report: str = None,
         preserve_context: bool = True,
         temperature: float = None,
         top_p: float = None,
@@ -156,6 +157,7 @@ class GeminiSRTTranslator:
         self.thinking_level = thinking_level
         self.service_tier = service_tier
         self.token_stats = token_stats
+        self.token_report = token_report
         self.preserve_context = preserve_context
         self.temperature = temperature
         self.top_p = top_p
@@ -173,6 +175,11 @@ class GeminiSRTTranslator:
         self.audio_part = None
         self.token_limit = 0
         self.token_count = 0
+        self._report_prompt_tokens = 0
+        self._report_thoughts_tokens = 0
+        self._report_output_tokens = 0
+        self._report_total_tokens = 0
+        self._start_time = time.time()
         self.translated_batch = []
         self.srt_extracted = False
         self.audio_extracted = False
@@ -723,6 +730,7 @@ class GeminiSRTTranslator:
                 if self.progress_log:
                     save_logs_to_file(self.log_file_path)
                 self._save_progress(max(1, i - len(batch) + max(0, last_chunk_size - 1) + 1))
+                self._write_token_report("translate")
                 exit(0)
 
             signal.signal(signal.SIGINT, handle_interrupt)
@@ -901,6 +909,8 @@ class GeminiSRTTranslator:
             translated_file.write(srt.compose(translated_subtitle, reindex=False, strict=False))
             translated_file.close()
 
+            self._write_token_report("translate")
+
             if self.audio_file and os.path.exists(self.audio_file) and self.audio_extracted:
                 os.remove(self.audio_file)
 
@@ -1003,6 +1013,82 @@ class GeminiSRTTranslator:
             return False
         return True
 
+    def _accumulate_report_tokens(
+        self,
+        prompt_tokens: int | None = None,
+        thoughts_tokens: int | None = None,
+        output_tokens: int | None = None,
+        total_tokens: int | None = None,
+    ) -> None:
+        if prompt_tokens is not None:
+            self._report_prompt_tokens += prompt_tokens
+        if thoughts_tokens is not None:
+            self._report_thoughts_tokens += thoughts_tokens
+        if output_tokens is not None:
+            self._report_output_tokens += output_tokens
+        if total_tokens is not None:
+            self._report_total_tokens += total_tokens
+
+    def _calculate_cost(self) -> dict | None:
+        pricing_path = os.path.join(os.path.dirname(__file__), "pricing.json")
+        try:
+            with open(pricing_path, "r", encoding="utf-8") as f:
+                pricing = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return None
+
+        tier = self.service_tier or "standard"
+        model_pricing = pricing.get("models", {}).get(self.model_name)
+        if not model_pricing:
+            return None
+
+        rates = model_pricing.get(tier) or model_pricing.get("standard")
+        if not rates:
+            return None
+
+        input_cost = self._report_prompt_tokens / 1_000_000 * rates["input"]
+        output_cost = (self._report_thoughts_tokens + self._report_output_tokens) / 1_000_000 * rates["output"]
+        return {
+            "input": round(input_cost, 6),
+            "output": round(output_cost, 6),
+            "total": round(input_cost + output_cost, 6),
+            "tier": tier,
+        }
+
+    def _write_token_report(self, mode: str) -> None:
+        if not self.token_report:
+            return
+        report = {
+            "timestamp": datetime.now().isoformat(),
+            "mode": mode,
+            "model": self.model_name,
+            "output_file": self.output_file,
+            "duration_seconds": round(time.time() - self._start_time, 2),
+            "tokens": {
+                "prompt": self._report_prompt_tokens,
+                "thoughts": self._report_thoughts_tokens,
+                "output": self._report_output_tokens,
+                "total": self._report_total_tokens,
+            },
+        }
+        if self.input_file:
+            report["input_file"] = self.input_file
+        if self.audio_file:
+            report["audio_file"] = self.audio_file
+        if mode == "translate" and self.target_language:
+            report["target_language"] = self.target_language
+        cost = self._calculate_cost()
+        if cost:
+            report["cost"] = cost
+        try:
+            report_dir = os.path.dirname(self.token_report)
+            if report_dir and not os.path.exists(report_dir):
+                os.makedirs(report_dir)
+            with open(self.token_report, "w", encoding="utf-8") as f:
+                json.dump(report, f, indent=2)
+        except (PermissionError, OSError) as e:
+            warning(f"Failed to write token report to {self.token_report}: {e}")
+
     def _process_batch(
         self,
         batch: list[SubtitleObject],
@@ -1087,6 +1173,12 @@ class GeminiSRTTranslator:
                     output_tokens=response.usage_metadata.candidates_token_count,
                     total_tokens=response.usage_metadata.total_token_count,
                 )
+                self._accumulate_report_tokens(
+                    prompt_tokens=response.usage_metadata.prompt_token_count,
+                    thoughts_tokens=response.usage_metadata.thoughts_token_count,
+                    output_tokens=response.usage_metadata.candidates_token_count,
+                    total_tokens=response.usage_metadata.total_token_count,
+                )
             else:
                 if blocked:
                     break
@@ -1140,6 +1232,28 @@ class GeminiSRTTranslator:
                         chunk_size=chunk_size,
                         isThinking=self.thinking and not done_thinking,
                         token_stats=self.token_stats,
+                        prompt_tokens=(
+                            chunk.usage_metadata.prompt_token_count - previous_prompt_tokens
+                            if chunk.usage_metadata and chunk.usage_metadata.prompt_token_count
+                            else None
+                        ),
+                        thoughts_tokens=(
+                            chunk.usage_metadata.thoughts_token_count - previous_thoughts_tokens
+                            if chunk.usage_metadata and chunk.usage_metadata.thoughts_token_count
+                            else None
+                        ),
+                        output_tokens=(
+                            chunk.usage_metadata.candidates_token_count - previous_output_tokens
+                            if chunk.usage_metadata and chunk.usage_metadata.candidates_token_count
+                            else None
+                        ),
+                        total_tokens=(
+                            chunk.usage_metadata.total_token_count - previous_total_tokens
+                            if chunk.usage_metadata and chunk.usage_metadata.total_token_count
+                            else None
+                        ),
+                    )
+                    self._accumulate_report_tokens(
                         prompt_tokens=(
                             chunk.usage_metadata.prompt_token_count - previous_prompt_tokens
                             if chunk.usage_metadata and chunk.usage_metadata.prompt_token_count
@@ -1416,6 +1530,7 @@ class GeminiSRTTranslator:
                     f.write(transcribed_subtitle)
             if self.progress_log:
                 save_logs_to_file(self.log_file_path)
+            self._write_token_report("transcribe")
             exit(0)
 
         signal.signal(signal.SIGINT, handle_interrupt)
@@ -1530,6 +1645,12 @@ class GeminiSRTTranslator:
                                     output_tokens=response.usage_metadata.candidates_token_count,
                                     total_tokens=response.usage_metadata.total_token_count,
                                 )
+                                self._accumulate_report_tokens(
+                                    prompt_tokens=response.usage_metadata.prompt_token_count,
+                                    thoughts_tokens=response.usage_metadata.thoughts_token_count,
+                                    output_tokens=response.usage_metadata.candidates_token_count,
+                                    total_tokens=response.usage_metadata.total_token_count,
+                                )
                             else:
                                 if blocked:
                                     break
@@ -1589,6 +1710,28 @@ class GeminiSRTTranslator:
                                             isTranscribing=True,
                                             isThinking=self.thinking and not done_thinking,
                                             token_stats=self.token_stats,
+                                            prompt_tokens=(
+                                                chunk.usage_metadata.prompt_token_count - previous_prompt_tokens
+                                                if chunk.usage_metadata and chunk.usage_metadata.prompt_token_count
+                                                else None
+                                            ),
+                                            thoughts_tokens=(
+                                                chunk.usage_metadata.thoughts_token_count - previous_thoughts_tokens
+                                                if chunk.usage_metadata and chunk.usage_metadata.thoughts_token_count
+                                                else None
+                                            ),
+                                            output_tokens=(
+                                                chunk.usage_metadata.candidates_token_count - previous_output_tokens
+                                                if chunk.usage_metadata and chunk.usage_metadata.candidates_token_count
+                                                else None
+                                            ),
+                                            total_tokens=(
+                                                chunk.usage_metadata.total_token_count - previous_total_tokens
+                                                if chunk.usage_metadata and chunk.usage_metadata.total_token_count
+                                                else None
+                                            ),
+                                        )
+                                        self._accumulate_report_tokens(
                                             prompt_tokens=(
                                                 chunk.usage_metadata.prompt_token_count - previous_prompt_tokens
                                                 if chunk.usage_metadata and chunk.usage_metadata.prompt_token_count
@@ -1731,10 +1874,12 @@ class GeminiSRTTranslator:
                 os.remove(self.progress_file)
             if self.progress_log:
                 save_logs_to_file(self.log_file_path)
+            self._write_token_report("transcribe")
             if extracted and self.audio_file and os.path.exists(self.audio_file):
                 os.remove(self.audio_file)
 
         except Exception as e:
             error(f"Error during transcription: {e}", ignore_quiet=True)
             self._save_transcribe_progress(last_saved_time)
+            self._write_token_report("transcribe")
             exit(1)
