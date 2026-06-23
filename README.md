@@ -230,6 +230,7 @@ gst translate \
   --thoughts-log \
   --extract-audio \
   --token-stats \
+  --token-report \
   --no-context
 ```
 
@@ -250,7 +251,8 @@ gst transcribe \
   --service-tier standard \
   --description "Meeting recording about project X" \
   --thinking-level high \
-  --token-stats
+  --token-stats \
+  --token-report
 ```
 
 #### Extracting Audio/Subtitles
@@ -371,6 +373,7 @@ gst.extract("audio")
 - `quiet`: Suppress all output (default: False).
 - `resume`: Skip prompt and set automatic resume mode.
 - `token_stats`: Show token usage information (default: False).
+- `token_report`: Save token usage and run statistics to a JSON file. If passed via CLI without arguments, it defaults to using the first available input filename with a `_token_report.json` suffix (default: None).
 - `preserve_context`: Preserve context between batches (default: True).
 
 #### 🔬 Model Tuning Parameters
@@ -422,6 +425,7 @@ gst.thoughts_log = True
 gst.quiet = False
 gst.resume = True
 gst.token_stats = True
+gst.token_report = "token_report.json"
 gst.preserve_context = True
 gst.service_tier = "standard"
 
