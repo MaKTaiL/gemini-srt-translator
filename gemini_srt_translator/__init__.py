@@ -33,7 +33,6 @@ import os
 from typing import Literal
 
 from .logger import set_quiet_mode
-from .main import GeminiSRTTranslator
 from .utils import upgrade_package
 
 gemini_api_key: str = os.getenv("GEMINI_API_KEY", None)
@@ -102,6 +101,8 @@ def getmodels():
         except Exception:
             exit(0)
 
+    from .main import GeminiSRTTranslator
+
     translator = GeminiSRTTranslator(gemini_api_key=gemini_api_key)
     return translator.getmodels()
 
@@ -131,6 +132,8 @@ def listmodels():
             upgrade_package("gemini-srt-translator", use_colors=use_colors)
         except Exception:
             exit(0)
+
+    from .main import GeminiSRTTranslator
 
     translator = GeminiSRTTranslator(
         gemini_api_key=gemini_api_key,
@@ -280,6 +283,8 @@ def translate():
         except Exception:
             exit(0)
 
+    from .main import GeminiSRTTranslator
+
     params = {
         "gemini_api_key": gemini_api_key,
         "gemini_api_key2": gemini_api_key2,
@@ -364,6 +369,8 @@ def extract(type: Literal["audio", "srt"]):
         except Exception:
             exit(0)
 
+    from .main import GeminiSRTTranslator
+
     params = {
         "video_file": video_file,
         "isolate_voice": isolate_voice,
@@ -415,6 +422,8 @@ def transcribe():
             upgrade_package("gemini-srt-translator", use_colors=use_colors)
         except Exception:
             exit(0)
+
+    from .main import GeminiSRTTranslator
 
     params = {
         "gemini_api_key": gemini_api_key,
