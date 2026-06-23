@@ -55,6 +55,26 @@ def select_model_interactive(available_models: list) -> str:
             error("Please enter a valid number.")
 
 
+def resolve_token_report_path(args) -> Optional[str]:
+    """Resolve token report path based on inputs if not explicitly provided."""
+    if args.token_report is None:
+        return None
+    if args.token_report == "":
+        base_file = None
+        if getattr(args, "video_file", None):
+            base_file = args.video_file
+        elif getattr(args, "input_file", None):
+            base_file = args.input_file
+        elif getattr(args, "audio_file", None):
+            base_file = args.audio_file
+
+        if base_file:
+            root, _ = os.path.splitext(base_file)
+            return f"{root}_token_report.json"
+        return "token_report.json"
+    return args.token_report
+
+
 def cmd_translate(args) -> None:
     """Handle translate command."""
 
@@ -143,8 +163,8 @@ def cmd_translate(args) -> None:
         gst.request_type = args.request_type
     if args.token_stats:
         gst.token_stats = args.token_stats
-    if args.token_report:
-        gst.token_report = args.token_report
+    if args.token_report is not None:
+        gst.token_report = resolve_token_report_path(args)
     if args.no_context:
         gst.preserve_context = not args.no_context
 
@@ -293,8 +313,8 @@ def cmd_transcribe(args) -> None:
         gst.service_tier = args.service_tier
     if args.token_stats:
         gst.token_stats = args.token_stats
-    if args.token_report:
-        gst.token_report = args.token_report
+    if args.token_report is not None:
+        gst.token_report = resolve_token_report_path(args)
     if args.temperature:
         gst.temperature = args.temperature
     if args.top_p:
@@ -402,7 +422,13 @@ Examples:
         help="Service tier for API requests (paid plans only)",
     )
     translate_parser.add_argument("--token-stats", action="store_true", default=None, help="Show token usage")
-    translate_parser.add_argument("--token-report", default=None, help="Write per-run token usage JSON to this path")
+    translate_parser.add_argument(
+        "--token-report",
+        nargs="?",
+        const="",
+        default=None,
+        help="Write per-run token usage JSON to this path",
+    )
     translate_parser.add_argument("--no-context", action="store_true", default=None, help="No context between batches")
     translate_parser.add_argument("--no-streaming", action="store_true", default=None, help="Disable streaming")
     translate_parser.add_argument("--no-thinking", action="store_true", default=None, help="Disable thinking mode")
@@ -467,7 +493,13 @@ Examples:
         help="Service tier for API requests (paid plans only)",
     )
     transcribe_parser.add_argument("--token-stats", action="store_true", default=None, help="Show token usage")
-    transcribe_parser.add_argument("--token-report", default=None, help="Write per-run token usage JSON to this path")
+    transcribe_parser.add_argument(
+        "--token-report",
+        nargs="?",
+        const="",
+        default=None,
+        help="Write per-run token usage JSON to this path",
+    )
     transcribe_parser.add_argument("--skip-upgrade", action="store_true", default=None, help="Skip upgrade check")
     transcribe_parser.add_argument("--temperature", type=float, help="Temperature (0.0-2.0)")
     transcribe_parser.add_argument("--top-p", type=float, help="Top P (0.0-1.0)")
