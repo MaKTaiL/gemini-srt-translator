@@ -143,6 +143,8 @@ def cmd_translate(args) -> None:
         gst.request_type = args.request_type
     if args.token_stats:
         gst.token_stats = args.token_stats
+    if args.token_report:
+        gst.token_report = args.token_report
     if args.no_context:
         gst.preserve_context = not args.no_context
 
@@ -291,6 +293,8 @@ def cmd_transcribe(args) -> None:
         gst.service_tier = args.service_tier
     if args.token_stats:
         gst.token_stats = args.token_stats
+    if args.token_report:
+        gst.token_report = args.token_report
     if args.temperature:
         gst.temperature = args.temperature
     if args.top_p:
@@ -301,6 +305,8 @@ def cmd_transcribe(args) -> None:
         gst.streaming = not args.no_streaming
     if args.no_thinking:
         gst.thinking = not args.no_thinking
+    if args.skip_upgrade:
+        gst.skip_upgrade = args.skip_upgrade
     if args.no_colors:
         gst.use_colors = not args.no_colors
     if args.progress_log:
@@ -396,6 +402,7 @@ Examples:
         help="Service tier for API requests (paid plans only)",
     )
     translate_parser.add_argument("--token-stats", action="store_true", default=None, help="Show token usage")
+    translate_parser.add_argument("--token-report", default=None, help="Write per-run token usage JSON to this path")
     translate_parser.add_argument("--no-context", action="store_true", default=None, help="No context between batches")
     translate_parser.add_argument("--no-streaming", action="store_true", default=None, help="Disable streaming")
     translate_parser.add_argument("--no-thinking", action="store_true", default=None, help="Disable thinking mode")
@@ -460,6 +467,8 @@ Examples:
         help="Service tier for API requests (paid plans only)",
     )
     transcribe_parser.add_argument("--token-stats", action="store_true", default=None, help="Show token usage")
+    transcribe_parser.add_argument("--token-report", default=None, help="Write per-run token usage JSON to this path")
+    transcribe_parser.add_argument("--skip-upgrade", action="store_true", default=None, help="Skip upgrade check")
     transcribe_parser.add_argument("--temperature", type=float, help="Temperature (0.0-2.0)")
     transcribe_parser.add_argument("--top-p", type=float, help="Top P (0.0-1.0)")
     transcribe_parser.add_argument("--top-k", type=int, help="Top K (>=0)")

@@ -61,6 +61,7 @@ thinking_budget: int = None
 thinking_level: Literal["minimal", "low", "medium", "high"] = None
 service_tier: Literal["standard", "flex", "priority"] = None
 token_stats: bool = None
+token_report: str = None
 preserve_context: bool = None
 temperature: float = None
 top_p: float = None
@@ -305,6 +306,7 @@ def translate():
         "thinking_level": thinking_level,
         "service_tier": service_tier,
         "token_stats": token_stats,
+        "token_report": token_report,
         "preserve_context": preserve_context,
         "temperature": temperature,
         "top_p": top_p,
@@ -435,6 +437,7 @@ def transcribe():
         "thinking_level": thinking_level,
         "service_tier": service_tier,
         "token_stats": token_stats,
+        "token_report": token_report,
         "temperature": temperature,
         "top_p": top_p,
         "top_k": top_k,
