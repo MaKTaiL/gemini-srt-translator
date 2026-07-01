@@ -206,7 +206,13 @@ def extract_srt_from_video(video_path):
 def check_ffmpeg_installation():
     """Checks if FFmpeg is installed and accessible."""
     try:
-        _run_command(["ffmpeg", "-version"], capture_output=True)
+        subprocess.run(
+            ["ffmpeg", "-version"],
+            capture_output=True,
+            text=True,
+            check=True,
+            encoding="utf-8",
+        )
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
