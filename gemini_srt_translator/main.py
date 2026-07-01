@@ -14,7 +14,6 @@ import srt
 from google import genai
 from google.genai import types
 from google.genai.types import Content
-from pydub import AudioSegment
 from srt import Subtitle
 
 from gemini_srt_translator.logger import (
@@ -477,6 +476,8 @@ class GeminiSRTTranslator:
                 exit(1)
 
         if self.audio_file:
+            from pydub import AudioSegment
+
             if os.path.exists(self.audio_file):
                 self.audio = AudioSegment.from_file(self.audio_file)
             else:
@@ -1442,6 +1443,8 @@ class GeminiSRTTranslator:
         """
         Transcribe audio file into subtitles.
         """
+        from pydub import AudioSegment
+
         extracted = False
         if self.video_file and not self.audio_file:
             self.audio_file = extract_audio_from_video(self.video_file, isolate_voice=self.isolate_voice)
