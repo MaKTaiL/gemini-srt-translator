@@ -731,7 +731,7 @@ class GeminiSRTTranslator:
                     save_logs_to_file(self.log_file_path)
                 self._save_progress(max(1, i - len(batch) + max(0, last_chunk_size - 1) + 1))
                 self._write_token_report("translate")
-                exit(0)
+                exit(130)
 
             signal.signal(signal.SIGINT, handle_interrupt)
 
