@@ -2,6 +2,8 @@ import json
 import os
 import re
 import signal
+import stat
+import tempfile
 import time
 import typing
 import unicodedata as ud
@@ -364,6 +366,43 @@ class GeminiSRTTranslator:
         except Exception as e:
             warning_with_progress(f"Failed to save progress: {e}")
 
+    def _write_text_atomically(self, path: str, text: str):
+        """Write text to a sibling temporary file before replacing the target."""
+        directory = os.path.dirname(os.path.abspath(path)) or "."
+        filename = os.path.basename(path)
+        temp_path = None
+        file_descriptor = None
+        try:
+            output_mode = stat.S_IMODE(os.stat(path).st_mode)
+        except FileNotFoundError:
+            current_umask = os.umask(0)
+            os.umask(current_umask)
+            output_mode = 0o666 & ~current_umask
+
+        try:
+            file_descriptor, temp_path = tempfile.mkstemp(
+                prefix=f".{filename}.",
+                suffix=".tmp",
+                dir=directory,
+                text=True,
+            )
+            with os.fdopen(file_descriptor, "w", encoding="utf-8") as temp_file:
+                file_descriptor = None
+                temp_file.write(text)
+                temp_file.flush()
+                os.fsync(temp_file.fileno())
+            os.chmod(temp_path, output_mode)
+            os.replace(temp_path, path)
+            temp_path = None
+        finally:
+            if file_descriptor is not None:
+                os.close(file_descriptor)
+            if temp_path and os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    def _write_translated_subtitles(self, translated_subtitle):
+        self._write_text_atomically(self.output_file, srt.compose(translated_subtitle, reindex=False, strict=False))
+
     def _save_transcribe_progress(self, time_in_seconds):
         """Save current transcription progress to a temporary file."""
         if not self.progress_file:
@@ -568,8 +607,8 @@ class GeminiSRTTranslator:
             original_text = original_file.read()
             original_subtitle = list(srt.parse(original_text))
             try:
-                translated_file_exists = open(self.output_file, "r", encoding="utf-8")
-                translated_subtitle = list(srt.parse(translated_file_exists.read()))
+                with open(self.output_file, "r", encoding="utf-8") as translated_file_exists:
+                    translated_subtitle = list(srt.parse(translated_file_exists.read()))
                 if self.use_colors:
                     info(
                         f"Translated file \033[90m{self.output_file}\033[94m already exists. Loading existing translation...\n"
@@ -605,8 +644,6 @@ class GeminiSRTTranslator:
                     ignore_quiet=True,
                 )
                 exit(1)
-
-            translated_file = open(self.output_file, "w", encoding="utf-8")
 
             if self.start_line > len(original_subtitle) or self.start_line < 1:
                 error(
@@ -725,9 +762,7 @@ class GeminiSRTTranslator:
                     f"Translation interrupted. Saving partial results to file. Progress saved.",
                     chunk_size=max(0, last_chunk_size - 1),
                 )
-                if translated_file:
-                    translated_file.write(srt.compose(translated_subtitle, reindex=False, strict=False))
-                    translated_file.close()
+                self._write_translated_subtitles(translated_subtitle)
                 if self.progress_log:
                     save_logs_to_file(self.log_file_path)
                 self._save_progress(max(1, i - len(batch) + max(0, last_chunk_size - 1) + 1))
@@ -907,8 +942,7 @@ class GeminiSRTTranslator:
                 success_with_progress("✅ Translation completed successfully!")
             if self.progress_log:
                 save_logs_to_file(self.log_file_path)
-            translated_file.write(srt.compose(translated_subtitle, reindex=False, strict=False))
-            translated_file.close()
+            self._write_translated_subtitles(translated_subtitle)
 
             self._write_token_report("translate")
 
