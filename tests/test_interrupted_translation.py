@@ -1,4 +1,6 @@
 import json
+import os
+import stat
 import tempfile
 import unittest
 from pathlib import Path
@@ -58,6 +60,32 @@ class InterruptedTranslationTests(unittest.TestCase):
                     translator.translate()
 
             self.assertEqual(raised.exception.code, "output remained intact")
+
+    @unittest.skipIf(os.name == "nt", "POSIX permission bits are not meaningful on Windows")
+    def test_atomic_write_uses_normal_file_permissions_for_new_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_file = Path(tmp) / "sample.zh.srt"
+            translator = GeminiSRTTranslator(output_file=str(output_file))
+            old_umask = os.umask(0o022)
+            try:
+                translator._write_text_atomically(str(output_file), "translated")
+            finally:
+                os.umask(old_umask)
+
+            self.assertEqual(stat.S_IMODE(output_file.stat().st_mode), 0o644)
+
+    @unittest.skipIf(os.name == "nt", "POSIX permission bits are not meaningful on Windows")
+    def test_atomic_write_preserves_existing_output_permissions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_file = Path(tmp) / "sample.zh.srt"
+            output_file.write_text("previous", encoding="utf-8")
+            output_file.chmod(0o664)
+            translator = GeminiSRTTranslator(output_file=str(output_file))
+
+            translator._write_text_atomically(str(output_file), "translated")
+
+            self.assertEqual(output_file.read_text(encoding="utf-8"), "translated")
+            self.assertEqual(stat.S_IMODE(output_file.stat().st_mode), 0o664)
 
     def test_translation_interruption_exits_nonzero(self):
         with tempfile.TemporaryDirectory() as tmp:

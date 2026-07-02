@@ -2,6 +2,7 @@ import json
 import os
 import re
 import signal
+import stat
 import tempfile
 import time
 import typing
@@ -371,6 +372,12 @@ class GeminiSRTTranslator:
         filename = os.path.basename(path)
         temp_path = None
         file_descriptor = None
+        try:
+            output_mode = stat.S_IMODE(os.stat(path).st_mode)
+        except FileNotFoundError:
+            current_umask = os.umask(0)
+            os.umask(current_umask)
+            output_mode = 0o666 & ~current_umask
 
         try:
             file_descriptor, temp_path = tempfile.mkstemp(
@@ -384,6 +391,7 @@ class GeminiSRTTranslator:
                 temp_file.write(text)
                 temp_file.flush()
                 os.fsync(temp_file.fileno())
+            os.chmod(temp_path, output_mode)
             os.replace(temp_path, path)
             temp_path = None
         finally:
