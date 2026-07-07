@@ -382,10 +382,17 @@ def warning_with_progress(
 
 
 def error_with_progress(
-    message: Any, chunk_size: int = 0, isSending: bool = False, isTranscribing: bool = False
+    message: Any,
+    chunk_size: int = 0,
+    isSending: bool = False,
+    isTranscribing: bool = False,
+    ignore_quiet: bool = False,
 ) -> None:
     """Update the progress bar with an error message"""
+    if _quiet_mode and not ignore_quiet:
+        return
     if _quiet_mode:
+        error(message, ignore_quiet=True)
         return
     progress_bar(
         **_last_progress,
