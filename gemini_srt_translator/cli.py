@@ -143,6 +143,8 @@ def cmd_translate(args) -> None:
         gst.audio_chunk_size = args.audio_chunk_size
     if args.start_line:
         gst.start_line = args.start_line
+    if args.resume_context_size is not None:
+        gst.resume_context_size = args.resume_context_size
     if args.description:
         gst.description = args.description
     if args.batch_size:
@@ -406,6 +408,12 @@ Examples:
     translate_parser.add_argument("-o", "--output-file", help="Output file path")
     translate_parser.add_argument("-a", "--audio-file", help="Audio file for context")
     translate_parser.add_argument("-s", "--start-line", type=int, help="Starting line number")
+    translate_parser.add_argument(
+        "--resume-context-size",
+        type=int,
+        default=None,
+        help="Number of previous lines to include as context when resuming (default: 50, 0 disables)",
+    )
     translate_parser.add_argument("-d", "--description", help="Description for translation context")
     translate_parser.add_argument("-m", "--model", help="Gemini model to use")
     translate_parser.add_argument("-b", "--batch-size", type=int, help="Batch size for translation")

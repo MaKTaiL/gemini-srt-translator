@@ -61,6 +61,66 @@ class InterruptedTranslationTests(unittest.TestCase):
 
             self.assertEqual(raised.exception.code, "output remained intact")
 
+    def test_resume_context_size_limits_initial_resume_context(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = Path(tmp)
+            input_file = root / "sample.en.srt"
+            output_file = root / "sample.zh.srt"
+            progress_file = root / "sample.en.progress"
+            input_file.write_text(
+                "1\n00:00:01,000 --> 00:00:02,000\nLine one\n\n"
+                "2\n00:00:03,000 --> 00:00:04,000\nLine two\n\n"
+                "3\n00:00:05,000 --> 00:00:06,000\nLine three\n\n"
+                "4\n00:00:07,000 --> 00:00:08,000\nLine four\n\n"
+                "5\n00:00:09,000 --> 00:00:10,000\nLine five\n",
+                encoding="utf-8",
+            )
+            output_file.write_text(
+                "1\n00:00:01,000 --> 00:00:02,000\n第一行\n\n"
+                "2\n00:00:03,000 --> 00:00:04,000\n第二行\n\n"
+                "3\n00:00:05,000 --> 00:00:06,000\n第三行\n\n"
+                "4\n00:00:07,000 --> 00:00:08,000\n第四行\n\n"
+                "5\n00:00:09,000 --> 00:00:10,000\nLine five\n",
+                encoding="utf-8",
+            )
+            progress_file.write_text(json.dumps({"line": 5, "input_file": str(input_file)}), encoding="utf-8")
+
+            translator = GeminiSRTTranslator(
+                gemini_api_key="test-key",
+                target_language="Simplified Chinese",
+                input_file=str(input_file),
+                output_file=str(output_file),
+                model_name="gemini-flash-latest",
+                batch_size=100,
+                resume=True,
+                resume_context_size=2,
+                use_colors=False,
+            )
+
+            def capture_context(batch, previous_message, translated_subtitle):
+                source_context = json.loads(previous_message[0].parts[0].text)
+                translated_context = json.loads(previous_message[1].parts[0].text)
+                self.assertEqual([line["index"] for line in source_context], ["2", "3"])
+                self.assertEqual([line["index"] for line in translated_context], ["2", "3"])
+                raise SystemExit("context captured")
+
+            with (
+                patch.object(translator, "getmodels", return_value=["gemini-flash-latest"]),
+                patch.object(translator, "_get_token_limit", return_value=None),
+                patch.object(translator, "_validate_token_size", return_value=True),
+                patch.object(translator, "_process_batch", side_effect=capture_context),
+                patch("gemini_srt_translator.main.progress_bar", return_value=None),
+                patch("gemini_srt_translator.main.info_with_progress", return_value=None),
+                patch("gemini_srt_translator.main.warning_with_progress", return_value=None),
+                patch("gemini_srt_translator.main.error_with_progress", return_value=None),
+                patch("gemini_srt_translator.main.success_with_progress", return_value=None),
+                patch("gemini_srt_translator.main.highlight", return_value=None),
+            ):
+                with self.assertRaises(SystemExit) as raised:
+                    translator.translate()
+
+            self.assertEqual(raised.exception.code, "context captured")
+
     @unittest.skipIf(os.name == "nt", "POSIX permission bits are not meaningful on Windows")
     def test_atomic_write_uses_normal_file_permissions_for_new_output(self):
         with tempfile.TemporaryDirectory() as tmp:

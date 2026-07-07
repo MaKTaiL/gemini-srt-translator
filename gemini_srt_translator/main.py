@@ -88,6 +88,7 @@ class GeminiSRTTranslator:
         extract_audio: bool = False,
         isolate_voice: bool = True,
         start_line: int = None,
+        resume_context_size: int = 50,
         description: str = None,
         model_name: str = "gemini-3.5-flash",
         batch_size: int = 1000,
@@ -149,6 +150,7 @@ class GeminiSRTTranslator:
         self.extract_audio = extract_audio
         self.isolate_voice = isolate_voice
         self.start_line = start_line
+        self.resume_context_size = max(0, int(resume_context_size or 0))
         self.description = description
         self.model_name = model_name
         self.batch_size = batch_size
@@ -673,8 +675,8 @@ class GeminiSRTTranslator:
             total = len(original_subtitle)
             batch = []
             previous_message = []
-            if self.start_line > 1:
-                start_idx = max(0, self.start_line - 2 - self.batch_size)
+            if self.start_line > 1 and self.resume_context_size > 0:
+                start_idx = max(0, self.start_line - 1 - self.resume_context_size)
                 parts_user = []
                 subtitle_array: list[SubtitleObject] = []
                 offset = 0

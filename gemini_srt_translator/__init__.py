@@ -51,6 +51,7 @@ audio_chunk_size: int = None
 extract_audio: bool = None
 isolate_voice: bool = None
 start_line: int = None
+resume_context_size: int = None
 description: str = None
 model_name: str = None
 batch_size: int = None
@@ -208,6 +209,9 @@ def translate():
     # (Optional) Line number to start translation from
     gst.start_line = 120
 
+    # (Optional) Number of previous lines to include when resuming (default: 50, 0 disables resume context)
+    gst.resume_context_size = 50
+
     # (Optional) Additional description of the translation task
     gst.description = "This subtitle is from a TV Series called 'Friends'."
 
@@ -302,6 +306,7 @@ def translate():
         "extract_audio": extract_audio,
         "isolate_voice": isolate_voice,
         "start_line": start_line,
+        "resume_context_size": resume_context_size,
         "description": description,
         "model_name": model_name,
         "batch_size": batch_size,
