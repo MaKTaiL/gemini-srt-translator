@@ -877,15 +877,15 @@ class GeminiSRTTranslator:
                     warning_with_progress(
                         f"Consecutive error count: {self.consecutive_error_count}/{self.max_consecutive_errors}"
                     )
+                    e_str = str(e).lower()
 
                     if self.consecutive_error_count >= self.max_consecutive_errors:
                         error_with_progress(
-                            f"Stopping script due to reaching {self.max_consecutive_errors} consecutive errors to prevent API quota waste."
+                            f"Stopping script due to reaching {self.max_consecutive_errors} consecutive errors to prevent API quota waste. Last error: {e}",
+                            ignore_quiet=True,
                         )
                         signal.raise_signal(signal.SIGINT)
                         time.sleep(2)
-
-                    e_str = str(e).lower()
 
                     if "quota" in e_str:
                         current_time = time.time()
@@ -912,7 +912,8 @@ class GeminiSRTTranslator:
                             continue
                         else:
                             error_with_progress(
-                                f"Model is still overloaded after {max_overload_retries} attempts. Aborting."
+                                f"Model is still overloaded after {max_overload_retries} attempts. Aborting. Last error: {e}",
+                                ignore_quiet=True,
                             )
                             signal.raise_signal(signal.SIGINT)
 
