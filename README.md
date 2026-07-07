@@ -206,6 +206,9 @@ gst translate -i subtitle.srt -l "Brazilian Portuguese" --interactive
 # Resume translation from a specific line
 gst translate -i subtitle.srt -l French --start-line 20
 
+# Limit saved-progress resume context to 50 previous lines (0 disables it)
+gst translate -i subtitle.srt -l French --resume --resume-context-size 50
+
 # Suppress output
 gst translate -i subtitle.srt -l French --quiet
 ```
@@ -363,6 +366,7 @@ gst.extract("audio")
 - `audio_chunk_size`: Audio chunk size in seconds for processing (default: 600).
 - `output_file`: Name of the translated file.
 - `start_line`: Starting line for translation.
+- `resume_context_size`: Number of previous lines to include as context when resuming (default: 50, 0 disables resume context).
 - `description`: Description of the translation job.
 - `batch_size`: Batch size (default: 1000).
 - `free_quota`: Signal GST that you are using a free quota (default: True).
@@ -424,6 +428,7 @@ gst.progress_log = True
 gst.thoughts_log = True
 gst.quiet = False
 gst.resume = True
+gst.resume_context_size = 50
 gst.token_stats = True
 gst.token_report = "token_report.json"
 gst.preserve_context = True
