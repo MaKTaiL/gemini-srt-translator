@@ -25,14 +25,15 @@ def get_key_from_env(key: str) -> Optional[str]:
     return api_key.strip() if api_key else None
 
 
-def validate_file_path(file_path: str, extension: str = None) -> bool:
+def validate_file_path(file_path: str, extension: str | tuple = None) -> bool:
     """Validate if file exists and has correct extension."""
     if not os.path.isfile(file_path):
         error(f"File does not exist: {file_path}")
         return False
 
     if extension and not file_path.lower().endswith(extension):
-        error(f"File must have {extension} extension: {file_path}")
+        ext_str = " or ".join(extension) if isinstance(extension, tuple) else extension
+        error(f"File must have {ext_str} extension: {file_path}")
         return False
 
     return True
@@ -110,7 +111,7 @@ def cmd_translate(args) -> None:
 
     # Validate input file
     if args.input_file:
-        if not validate_file_path(args.input_file, ".srt"):
+        if not validate_file_path(args.input_file, (".srt", ".ass")):
             sys.exit(1)
         gst.input_file = args.input_file
     if args.video_file:
@@ -355,7 +356,7 @@ def create_parser() -> argparse.ArgumentParser:
     """Create and configure argument parser."""
     parser = argparse.ArgumentParser(
         prog="gst",
-        description="Translate SRT subtitle files using Google Gemini AI",
+        description="Translate SRT/ASS subtitle files using Google Gemini AI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -400,8 +401,8 @@ Examples:
     # Translate command
     translate_parser = subparsers.add_parser("translate", help="Translate subtitle files")
     required_group_translate = translate_parser.add_argument_group("required arguments")
-    required_group_translate.add_argument("-i", "--input-file", help="Input SRT file path")
-    required_group_translate.add_argument("-v", "--video-file", help="Video file path (for SRT/Audio extraction)")
+    required_group_translate.add_argument("-i", "--input-file", help="Input SRT or ASS file path")
+    required_group_translate.add_argument("-v", "--video-file", help="Video file path (for SRT/ASS/Audio extraction)")
     translate_parser.add_argument("-l", "--target-language", help="Target language for translation")
     translate_parser.add_argument("-k", "--api-key", help="Gemini API key")
     translate_parser.add_argument("-k2", "--api-key2", help="Secondary Gemini API key for additional quota")

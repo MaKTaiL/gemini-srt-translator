@@ -166,8 +166,7 @@ The output must be a JSON array. Each object must contain `text`, `time_start`, 
 ## {section_number}. Dialogue and Continuity
 - **Multiple Speakers**: Use a hyphen: `- Are you coming?\\n- In a minute.`
 - **Interruptions**: Use two hyphens: `- What are you--\\n- Be quiet!`
-- **Significant Pauses (2+ sec)**: End the preceding subtitle with an ellipsis (`...`).
-- **Starting Mid-Sentence**: Begin the subtitle with an ellipsis (`...like this.`)."""
+- **Significant Pauses (2+ sec)**: End the subtitle with an ellipsis (`...`)."""
     prompt_parts.append(dialogue_rules)
 
     # --- Section 5: Text and Number Formatting ---

@@ -5,7 +5,6 @@ from datetime import timedelta
 from enum import Enum
 from typing import Any
 
-import srt
 
 # Global variable to control color output
 _use_colors = True
@@ -232,8 +231,14 @@ def progress_bar(
     if not isTranscribing:
         progress_text = f"{prefix} |{bar}| {percentage}% ({current + _last_chunk_size}/{total})"
     else:
-        current_text = srt.timedelta_to_srt_timestamp(timedelta(seconds=current + _last_chunk_size))
-        total_text = srt.timedelta_to_srt_timestamp(timedelta(seconds=total))
+        def format_time(s: float) -> str:
+            td = timedelta(seconds=s)
+            hours, remainder = divmod(td.seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            return f"{hours:02}:{minutes:02}:{seconds:02},{td.microseconds // 1000:03}"
+            
+        current_text = format_time(current + _last_chunk_size)
+        total_text = format_time(total)
         progress_text = f"{prefix} |{bar}| {percentage}% ({current_text}/{total_text})"
     # Format the progress bar line
     if suffix:

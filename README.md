@@ -9,7 +9,7 @@
 [![GitHub contributors](https://img.shields.io/github/contributors/MaKTaiL/gemini-srt-translator)](https://github.com/MaKTaiL/gemini-srt-translator/graphs/contributors)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-orange?logo=buy-me-a-coffee)](https://www.buymeacoffee.com/maktail)
 
-> Translate SRT subtitle files using the power of Google Gemini AI! 🚀
+> Translate SRT and ASS subtitle files using the power of Google Gemini AI! 🚀
 
 ---
 
@@ -19,14 +19,14 @@
 
 ---
 
-- 🔤 **SRT Translation**: Translate `.srt` subtitle files to a wide range of languages supported by Google Gemini AI.
-- 🎙️ **Transcription**: Transcribe audio or video files directly into SRT subtitles using Gemini's audio capabilities.
-- ⏱️ **Timing & Format**: Ensures that the translated subtitles maintain the exact timestamps and basic SRT formatting of the original file.
+- 🔤 **Subtitle Translation**: Translate `.srt` and `.ass` subtitle files to a wide range of languages supported by Google Gemini AI.
+- 🎙️ **Transcription**: Transcribe audio or video files directly into subtitles using Gemini's audio capabilities.
+- ⏱️ **Timing & Format**: Ensures that the translated subtitles maintain the exact timestamps and native SRT/ASS formatting of the original file.
 - 💾 **Quick Resume**: Easily resume interrupted translations from where you left off.
 - 🧠 **Advanced AI**: Leverages thinking and reasoning capabilities for more contextually accurate translations (available on Gemini 2.5 and 3 models).
 - 🖥️ **CLI Support**: Full command-line interface for easy automation and scripting.
 - ⚙️ **Customizable**: Tune model parameters, adjust batch size, and access other advanced settings.
-- 🎞️ **SRT Extraction**: Extract and translate SRT subtitles from video files automatically (requires [FFmpeg](https://ffmpeg.org/)).
+- 🎞️ **Subtitle Extraction**: Extract and translate native SRT or ASS subtitles from video files automatically (requires [FFmpeg](https://ffmpeg.org/)).
 - 🎵 **Audio Context**: Extract audio from a video file or provide your own to improve translation accuracy (requires [FFmpeg](https://ffmpeg.org/)).
 - 📜 **Description Support**: Add a description to your translation job to guide the AI in using specific terminology or context.
 - 📋 **List Models**: Easily list all currently available Gemini models to choose the best fit for your needs.
@@ -191,7 +191,7 @@ gst translate -i subtitle.srt -l French
 # Using command line argument
 gst translate -i subtitle.srt -l French -k YOUR_API_KEY
 
-# Set output file name
+# Set output file name (can be .srt or .ass)
 gst translate -i subtitle.srt -l French -o translated_subtitle.srt
 
 # Extract subtitles from video and translate (requires FFmpeg)

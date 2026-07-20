@@ -1,5 +1,6 @@
 # GST Files
 *.srt
+*.ass
 traduzir.py
 translate.py
 *.progress
