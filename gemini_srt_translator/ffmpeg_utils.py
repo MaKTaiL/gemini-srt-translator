@@ -181,23 +181,44 @@ def extract_audio_from_video(video_path, isolate_voice=False, target_mb=20):
             os.remove(temp_wav_path)
 
 
-def extract_srt_from_video(video_path):
-    """Extracts the first subtitle track from a video into an SRT file."""
+def extract_subtitle_from_video(video_path):
+    """Extracts the first subtitle track from a video into its native format (ASS or SRT)."""
     base_name = os.path.splitext(os.path.basename(video_path))[0]
     output_dir = os.path.dirname(video_path)
-    srt_path = os.path.join(output_dir, f"{base_name}_extracted.srt")
+    
+    # check codec of first subtitle stream
+    ffprobe_cmd = [
+        "ffprobe",
+        "-v", "error",
+        "-select_streams", "s:0",
+        "-show_entries", "stream=codec_name",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        video_path
+    ]
+    try:
+        output = subprocess.run(ffprobe_cmd, capture_output=True, text=True, check=True, encoding="utf-8")
+        codec = output.stdout.strip().lower()
+    except Exception:
+        codec = ""
+        
+    ext = ".ass" if codec == "ass" else ".srt"
+    out_path = os.path.join(output_dir, f"{base_name}_extracted{ext}")
 
-    if os.path.exists(srt_path):
-        warning(f"Subtitle file '{os.path.basename(srt_path)}' already exists. Skipping.")
-        return srt_path
+    if os.path.exists(out_path):
+        warning(f"Subtitle file '{os.path.basename(out_path)}' already exists. Skipping.")
+        return out_path
 
-    cmd = ["ffmpeg", "-y", "-i", video_path, "-map", "0:s:0", srt_path]
+    cmd = ["ffmpeg", "-y", "-i", video_path, "-map", "0:s:0"]
+    if ext == ".ass":
+        cmd.extend(["-c:s", "copy"])
+    cmd.append(out_path)
+    
     try:
         info("Extracting subtitles...")
         _run_command(cmd)
         success("--- Success! ---")
-        success(f"Subtitles saved to: {srt_path}")
-        return srt_path
+        success(f"Subtitles saved to: {out_path}")
+        return out_path
     except subprocess.CalledProcessError:
         warning("Could not find a subtitle stream in the video file.")
         return None
