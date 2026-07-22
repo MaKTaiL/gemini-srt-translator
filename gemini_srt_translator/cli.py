@@ -482,6 +482,7 @@ Examples:
         "--isolate-voice", action="store_true", default=None, help="Isolate voice in audio extraction"
     )
     extract_parser.add_argument("--no-colors", action="store_true", default=None, help="Disable colored output")
+    extract_parser.add_argument("--skip-upgrade", action="store_true", default=None, help="Skip upgrade check")
 
     # Transcribe command
     transcribe_parser = subparsers.add_parser("transcribe", help="Transcribe audio to text")
@@ -538,6 +539,7 @@ Examples:
     # List models command
     list_parser = subparsers.add_parser("list-models", help="List available Gemini models")
     list_parser.add_argument("-k", "--api-key", help="Gemini API key")
+    list_parser.add_argument("--skip-upgrade", action="store_true", default=None, help="Skip upgrade check")
     list_parser.add_argument(
         "--use-enterprise", action="store_true", default=None, help="Use Enterprise / Agent Platform mode"
     )
