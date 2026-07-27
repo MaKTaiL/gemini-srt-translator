@@ -17,12 +17,14 @@ from google import genai
 from google.genai import types
 from google.genai.types import Content
 
+
 class Subtitle:
     def __init__(self, index: int, start: timedelta, end: timedelta, content: str):
         self.index = index
         self.start = start
         self.end = end
         self.content = content
+
 
 from gemini_srt_translator.logger import (
     error,
@@ -96,7 +98,7 @@ class GeminiSRTTranslator:
         start_line: int = None,
         resume_context_size: int = 50,
         description: str = None,
-        model_name: str = "gemini-3.5-flash",
+        model_name: str = "gemini-3.6-flash",
         batch_size: int = 1000,
         streaming: bool = True,
         thinking: bool = True,
@@ -420,18 +422,18 @@ class GeminiSRTTranslator:
         for i, ev in enumerate(subs):
             text = ev.text
             if extract_tags:
-                match = re.match(r'^(?:\{[^}]+\})+', text)
+                match = re.match(r"^(?:\{[^}]+\})+", text)
                 if match:
                     tags = match.group(0)
                     self.ass_tags_map[i + 1] = tags
-                    text = text[len(tags):]
-            
+                    text = text[len(tags) :]
+
             srt_subs.append(
                 Subtitle(
                     index=i + 1,
                     start=timedelta(milliseconds=ev.start),
                     end=timedelta(milliseconds=ev.end),
-                    content=text
+                    content=text,
                 )
             )
         return srt_subs
@@ -442,7 +444,7 @@ class GeminiSRTTranslator:
             idx = sub.index - 1
             if 0 <= idx < len(subs):
                 text = sub.content
-                if hasattr(self, 'ass_tags_map') and sub.index in self.ass_tags_map:
+                if hasattr(self, "ass_tags_map") and sub.index in self.ass_tags_map:
                     text = self.ass_tags_map[sub.index] + text
                 subs[idx].text = text
         subs.save(output_file, encoding="utf-8")
@@ -580,8 +582,8 @@ class GeminiSRTTranslator:
                 error("Failed to extract subtitles from video file.", ignore_quiet=True)
                 exit(1)
             self.srt_extracted = True
-            
-            if not getattr(self, '_output_file_explicit', False):
+
+            if not getattr(self, "_output_file_explicit", False):
                 ext = os.path.splitext(self.input_file)[1]
                 base_out = os.path.splitext(self.output_file)[0]
                 if ext == ".ass" and not self.output_file.lower().endswith(".ass"):
@@ -680,9 +682,7 @@ class GeminiSRTTranslator:
                             ).strip()
                         )
                         if self.start_line < 1 or self.start_line > len(original_subtitle):
-                            warning(
-                                f"Line number must be between 1 and {len(original_subtitle)}. Please try again."
-                            )
+                            warning(f"Line number must be between 1 and {len(original_subtitle)}. Please try again.")
                             continue
                         break
                     except ValueError:
@@ -1622,7 +1622,7 @@ class GeminiSRTTranslator:
                     ev = pysubs2.SSAEvent(
                         start=int(sub.start.total_seconds() * 1000),
                         end=int(sub.end.total_seconds() * 1000),
-                        text=sub.content
+                        text=sub.content,
                     )
                     subs.append(ev)
                 subs.save(self.output_file, encoding="utf-8")
@@ -1961,7 +1961,7 @@ class GeminiSRTTranslator:
                     ev = pysubs2.SSAEvent(
                         start=int(sub.start.total_seconds() * 1000),
                         end=int(sub.end.total_seconds() * 1000),
-                        text=sub.content
+                        text=sub.content,
                     )
                     subs.append(ev)
                 subs.save(self.output_file, encoding="utf-8")
