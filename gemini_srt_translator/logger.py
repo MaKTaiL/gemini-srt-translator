@@ -1,9 +1,16 @@
 import os
+import re
 import shutil
 import sys
 from datetime import timedelta
 from enum import Enum
 from typing import Any
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(errors="replace")
+    except Exception:
+        pass
 
 
 # Global variable to control color output
@@ -160,6 +167,13 @@ _prompt_token_count = 0
 _thoughts_token_count = 0
 _output_token_count = 0
 _total_token_count = 0
+_last_printed_lines = 0
+
+
+def visible_len(text: str) -> int:
+    """Calculate visible length of string ignoring ANSI color escape sequences."""
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return len(ansi_escape.sub('', str(text)))
 
 
 def progress_bar(
@@ -195,7 +209,7 @@ def progress_bar(
         message: Optional message to display below the progress bar
         message_color: Color to use for the message
     """
-    global _last_progress, _has_started, _previous_messages, _loading_bars_index, _last_chunk_size, _prompt_token_count, _thoughts_token_count, _output_token_count, _total_token_count, _token_stats
+    global _last_progress, _has_started, _previous_messages, _loading_bars_index, _last_chunk_size, _prompt_token_count, _thoughts_token_count, _output_token_count, _total_token_count, _token_stats, _last_printed_lines
 
     # Save the current state for message updates
     _last_progress = {
@@ -222,6 +236,8 @@ def progress_bar(
 
     # Get terminal width
     terminal_width = shutil.get_terminal_size().columns
+    if terminal_width <= 0:
+        terminal_width = 80
 
     # Create the progress bar
     progress_ratio = (current + _last_chunk_size) / total if total > 0 else 0
@@ -250,41 +266,11 @@ def progress_bar(
     elif current < total and isSending:
         progress_text = f"{progress_text} | Sending batch ↑↑↑"
 
-    # Calculate how many lines we need to clear based on previous messages and terminal width
-    # Start with at least 2 lines (progress bar + empty line)
-    if _token_stats:
-        lines_to_clear = 3
-    else:
-        lines_to_clear = 2
-
-    # Get the command used to start the script
-    command_line = " ".join([sys.executable] + sys.argv)
-    # Check if the command line is too long and needs to be wrapped
-    if len(command_line) > terminal_width:
-        # Add additional lines needed for wrapped command line
-        lines_to_clear += len(command_line) // terminal_width - 1
-
-    # Calculate how many lines the progress bar itself might take due to wrapping
-    progress_text_length = len(progress_text)
-    if progress_text_length > terminal_width:
-        # Add additional lines needed for wrapped progress bar text
-        lines_to_clear += progress_text_length // terminal_width
-
-    # Add lines for each previous message, accounting for wrapping
-    for msg in _previous_messages:
-        msg_text = msg["message"]
-        # Calculate how many lines this message would take (accounting for wrapping)
-        msg_lines = (len(msg_text) // terminal_width) + 1
-        lines_to_clear += msg_lines
-
-    # Handle the clearing of lines
+    # Handle the clearing of lines from the previous iteration
     if not _quiet_mode:
-        if _has_started:
-            # Move cursor to beginning of line
+        if _has_started and _last_printed_lines > 0:
             sys.stdout.write("\r")
-
-            # Clear each line individually by moving up and clearing
-            for _ in range(lines_to_clear):
+            for _ in range(_last_printed_lines):
                 sys.stdout.write("\033[F")  # Move up one line
                 sys.stdout.write("\033[K")  # Clear the line
         else:
@@ -292,61 +278,85 @@ def progress_bar(
 
     # Apply colors if enabled
     if _use_colors and Color.supports_color():
-        progress_text = progress_text.replace("█", f"{Color.GREEN.value}█{Color.BLUE.value}")
-        progress_text = progress_text.replace("↑", f"{Color.GREEN.value}↑{Color.BLUE.value}")
+        colored_progress_text = progress_text.replace("█", f"{Color.GREEN.value}█{Color.BLUE.value}")
+        colored_progress_text = colored_progress_text.replace("↑", f"{Color.GREEN.value}↑{Color.BLUE.value}")
         for i in range(len(_loading_bars)):
-            progress_text = progress_text.replace(
+            colored_progress_text = colored_progress_text.replace(
                 _loading_bars[i], f"{Color.GREEN.value}{_loading_bars[i]}{Color.BLUE.value}"
             )
-        progress_text = f"{Color.BLUE.value}{progress_text}{Color.RESET.value}"
-
-    if not _quiet_mode:
-        sys.stdout.write(progress_text)
-        if _token_stats:
-            if _use_colors and Color.supports_color():
-                sys.stdout.write(
-                    f"\nPrompt Tokens: {Color.BLUE.value}{_prompt_token_count}{Color.RESET.value} | Thoughts Tokens: {Color.BLUE.value}{_thoughts_token_count}{Color.RESET.value} | Output Tokens: {Color.BLUE.value}{_output_token_count}{Color.RESET.value} | Total Tokens: {Color.BLUE.value}{_total_token_count}{Color.RESET.value}"
-                )
-            else:
-                sys.stdout.write(
-                    f"\nPrompt Tokens: {_prompt_token_count} | Thoughts Tokens: {_thoughts_token_count} | Output Tokens: {_output_token_count} | Total Tokens: {_total_token_count}"
-                )
-        sys.stdout.write("\n\n")
+        colored_progress_text = f"{Color.BLUE.value}{colored_progress_text}{Color.RESET.value}"
+    else:
+        colored_progress_text = progress_text
 
     if len(_previous_messages) > 0 and "waiting" in _previous_messages[-1]["message"].lower():
         _previous_messages.pop()
 
-    if _quiet_mode:
-        return
-
-    for i in range(len(_previous_messages)):
-        if _use_colors and Color.supports_color():
-            color_code = _previous_messages[i]["color"].value if _previous_messages[i]["color"] else Color.YELLOW.value
-            sys.stdout.write(f"{color_code}{_previous_messages[i]['message']}{Color.RESET.value}\n")
-        else:
-            sys.stdout.write(_previous_messages[i]["message"] + "\n")
-
     if message:
         if not isPrompt:
             _previous_messages.append({"message": message, "color": message_color})
+
+    # Prepare output lines and calculate physical lines for clearing in next iteration
+    lines_plain = []
+    lines_colored = []
+
+    lines_plain.append(progress_text)
+    lines_colored.append(colored_progress_text)
+
+    if _token_stats:
+        plain_stats = f"Prompt Tokens: {_prompt_token_count} | Thoughts Tokens: {_thoughts_token_count} | Output Tokens: {_output_token_count} | Total Tokens: {_total_token_count}"
         if _use_colors and Color.supports_color():
-            color_code = message_color.value if message_color else Color.YELLOW.value
-            if isPrompt:
-                sys.stdout.write(f"{color_code}{Color.BOLD.value}{message}{Color.RESET.value}")
-                user_prompt = input()
-                sys.stdout.write("\033[F")
-                sys.stdout.write("\033[K")
-            else:
-                sys.stdout.write(f"{color_code}{message}{Color.RESET.value}" + "\n")
+            colored_stats = f"Prompt Tokens: {Color.BLUE.value}{_prompt_token_count}{Color.RESET.value} | Thoughts Tokens: {Color.BLUE.value}{_thoughts_token_count}{Color.RESET.value} | Output Tokens: {Color.BLUE.value}{_output_token_count}{Color.RESET.value} | Total Tokens: {Color.BLUE.value}{_total_token_count}{Color.RESET.value}"
         else:
-            if isPrompt:
-                sys.stdout.write(message)
-                user_prompt = input()
-                sys.stdout.write("\033[F")
-                sys.stdout.write("\033[K")
+            colored_stats = plain_stats
+        lines_plain.append(plain_stats)
+        lines_colored.append(colored_stats)
+
+    for msg in _previous_messages:
+        msg_str = msg["message"]
+        lines_plain.append(msg_str)
+        if _use_colors and Color.supports_color():
+            color_code = msg["color"].value if msg["color"] else Color.YELLOW.value
+            lines_colored.append(f"{color_code}{msg_str}{Color.RESET.value}")
+        else:
+            lines_colored.append(msg_str)
+
+    user_prompt = None
+    if not _quiet_mode:
+        # Print progress text and stats followed by empty line separator
+        if _token_stats:
+            sys.stdout.write(lines_colored[0] + "\n" + lines_colored[1] + "\n\n")
+        else:
+            sys.stdout.write(lines_colored[0] + "\n\n")
+
+        # Print messages
+        start_idx = 2 if _token_stats else 1
+        for i in range(start_idx, len(lines_colored)):
+            sys.stdout.write(lines_colored[i] + "\n")
+
+        if message and isPrompt:
+            if _use_colors and Color.supports_color():
+                color_code = message_color.value if message_color else Color.YELLOW.value
+                sys.stdout.write(f"{color_code}{Color.BOLD.value}{message}{Color.RESET.value}")
             else:
-                sys.stdout.write(message + "\n")
-    sys.stdout.flush()
+                sys.stdout.write(message)
+            sys.stdout.flush()
+            user_prompt = input()
+            sys.stdout.write("\033[F")
+            sys.stdout.write("\033[K")
+            sys.stdout.flush()
+
+        sys.stdout.flush()
+
+    # Calculate exact physical lines rendered on terminal
+    physical_lines = 0
+    for plain_line in lines_plain:
+        v_len = visible_len(plain_line)
+        physical_lines += max(1, (v_len + terminal_width - 1) // terminal_width)
+    # Plus 1 for the empty line separator after progress header (\n\n)
+    physical_lines += 1
+
+    _last_printed_lines = physical_lines
+
     return user_prompt if isPrompt else None
 
 
