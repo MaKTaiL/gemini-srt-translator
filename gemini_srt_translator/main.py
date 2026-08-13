@@ -1,6 +1,5 @@
 import json
 import os
-import re
 import signal
 import stat
 import tempfile
@@ -202,7 +201,6 @@ class GeminiSRTTranslator:
         self.ffmpeg_installed = check_ffmpeg_installation()
         self.consecutive_error_count = 0
         self.max_consecutive_errors = 3
-        self.ass_tags_map = {}
 
         set_color_mode(use_colors)
 
@@ -416,18 +414,11 @@ class GeminiSRTTranslator:
             if temp_path and os.path.exists(temp_path):
                 os.remove(temp_path)
 
-    def _parse_subtitle_file(self, file_path: str, extract_tags: bool = False) -> list:
-        subs = pysubs2.load(file_path, encoding="utf-8")
+    def _parse_subtitle_file(self, file_path: str) -> list:
+        subs = pysubs2.load(file_path, encoding="utf-8", keep_html_tags=True)
         srt_subs = []
         for i, ev in enumerate(subs):
-            text = ev.text
-            if extract_tags:
-                match = re.match(r"^(?:\{[^}]+\})+", text)
-                if match:
-                    tags = match.group(0)
-                    self.ass_tags_map[i + 1] = tags
-                    text = text[len(tags) :]
-
+            text = f"{ev.text.replace("\\N", "\n")}"
             srt_subs.append(
                 Subtitle(
                     index=i + 1,
@@ -443,10 +434,7 @@ class GeminiSRTTranslator:
         for sub in translated_subtitle:
             idx = sub.index - 1
             if 0 <= idx < len(subs):
-                text = sub.content
-                if hasattr(self, "ass_tags_map") and sub.index in self.ass_tags_map:
-                    text = self.ass_tags_map[sub.index] + text
-                subs[idx].text = text
+                subs[idx].text = f"{sub.content.replace("\n", "\\N")}"
         subs.save(output_file, encoding="utf-8")
 
     def _write_translated_subtitles(self, translated_subtitle):
@@ -502,7 +490,7 @@ class GeminiSRTTranslator:
                     )
                     try:
                         try:
-                            existing_subs = self._parse_subtitle_file(self.output_file, extract_tags=False)
+                            existing_subs = self._parse_subtitle_file(self.output_file)
                         except Exception:
                             existing_subs = []
                         if not existing_subs:
@@ -662,9 +650,9 @@ class GeminiSRTTranslator:
                 exit(1)
             self._get_token_limit()
 
-        original_subtitle = self._parse_subtitle_file(self.input_file, extract_tags=True)
+        original_subtitle = self._parse_subtitle_file(self.input_file)
         try:
-            translated_subtitle = self._parse_subtitle_file(self.output_file, extract_tags=False)
+            translated_subtitle = self._parse_subtitle_file(self.output_file)
             if self.use_colors:
                 info(
                     f"Translated file \033[90m{self.output_file}\033[94m already exists. Loading existing translation...\n"
