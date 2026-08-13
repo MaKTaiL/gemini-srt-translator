@@ -97,7 +97,7 @@ class GeminiSRTTranslator:
         start_line: int = None,
         resume_context_size: int = 50,
         description: str = None,
-        model_name: str = "gemini-3.6-flash",
+        model_name: str = "gemini-3.7-flash",
         batch_size: int = 1000,
         streaming: bool = True,
         thinking: bool = True,
