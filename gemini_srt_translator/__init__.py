@@ -188,7 +188,7 @@ def translate():
     # (Optional) Gemini API key 2 for additional quota
     gst.gemini_api_key2 = "your_gemini_api_key2_here"
 
-    # (Optional) Path to video file for srt extraction (if needed) and/or for audio context
+    # (Optional) Path to video file for subtitle extraction (if needed) and/or for audio context
     gst.video_file = "movie.mkv"
 
     # (Optional) Path to audio file for audio context
@@ -337,14 +337,14 @@ def translate():
     translator.translate()
 
 
-def extract(type: Literal["audio", "srt"]):
+def extract(type: Literal["audio", "subtitle"]):
     """
-    ## Extracts audio or subtitles (SRT) from a video file.
+    ## Extracts audio or subtitles from a video file.
         This function extracts either the audio or the subtitles from the specified video file.
         The extraction is done using FFmpeg.
 
     Args:
-        type (str): The type of extraction. Must be "audio" or "srt".
+        type (str): The type of extraction. Must be "audio" or "subtitle".
 
     Example:
     ```
@@ -360,12 +360,12 @@ def extract(type: Literal["audio", "srt"]):
     gst.extract("audio")
 
     # Extract subtitles
-    gst.extract("srt")
+    gst.extract("subtitle")
     ```
 
     Raises:
         Exception: If the video file is not provided.
-        ValueError: If the type is not "audio" or "srt".
+        ValueError: If the type is not "audio" or "subtitle".
     """
 
     if not skip_upgrade:
@@ -386,10 +386,10 @@ def extract(type: Literal["audio", "srt"]):
     translator = GeminiSRTTranslator(**filtered_params)
     if type == "audio":
         translator.extract("audio")
-    elif type == "srt":
-        translator.extract("srt")
+    elif type == "subtitle":
+        translator.extract("subtitle")
     else:
-        raise ValueError("Invalid extraction type. Must be 'audio' or 'srt'.")
+        raise ValueError("Invalid extraction type. Must be 'audio' or 'subtitle'.")
 
 
 def transcribe():

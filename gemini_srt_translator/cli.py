@@ -248,11 +248,11 @@ def cmd_extract(args) -> None:
     if args.isolate_voice:
         gst.isolate_voice = args.isolate_voice
 
-    if args.srt:
+    if args.subtitle:
         try:
-            gst.extract("srt")
+            gst.extract("subtitle")
         except Exception as e:
-            error(f"SRT extraction failed: {e}")
+            error(f"Subtitle extraction failed: {e}")
             sys.exit(1)
 
     if args.audio:
@@ -388,8 +388,8 @@ Examples:
   # List available models
     gst list-models -k YOUR_API_KEY
 
-  # Extract audio and SRT from video with voice isolation
-    gst extract -v movie.mp4 --srt --audio --isolate-voice
+  # Extract audio and subtitles from video with voice isolation
+    gst extract -v movie.mp4 --subtitle --audio --isolate-voice
 
   # Extract audio from video and transcribe to subtitle file
     gst transcribe -v movie.mp4 -k YOUR_API_KEY -o transcription.srt
@@ -472,11 +472,11 @@ Examples:
         "--request-type", choices=["shared", "dedicated"], help="Vertex AI request type ('shared' or 'dedicated')"
     )
 
-    # Extract audio command
-    extract_parser = subparsers.add_parser("extract", help="Extract audio and/or srt from video file")
+    # Extract audio and/or subtitles command
+    extract_parser = subparsers.add_parser("extract", help="Extract audio and/or subtitles from video file")
     required_group_extract = extract_parser.add_argument_group("required arguments")
     required_group_extract.add_argument("-v", "--video-file", help="Video file path")
-    extract_parser.add_argument("--srt", action="store_true", default=None, help="Extract SRT subtitles from video")
+    extract_parser.add_argument("--subtitle", action="store_true", default=None, help="Extract subtitles from video")
     extract_parser.add_argument("--audio", action="store_true", default=None, help="Extract audio from video")
     extract_parser.add_argument(
         "--isolate-voice", action="store_true", default=None, help="Isolate voice in audio extraction"

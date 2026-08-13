@@ -196,7 +196,7 @@ class GeminiSRTTranslator:
         self._report_total_tokens = 0
         self._start_time = time.time()
         self.translated_batch = []
-        self.srt_extracted = False
+        self.subtitle_extracted = False
         self.audio_extracted = False
         self.ffmpeg_installed = check_ffmpeg_installation()
         self.consecutive_error_count = 0
@@ -569,7 +569,7 @@ class GeminiSRTTranslator:
             if not self.input_file:
                 error("Failed to extract subtitles from video file.", ignore_quiet=True)
                 exit(1)
-            self.srt_extracted = True
+            self.subtitle_extracted = True
 
             if not getattr(self, "_output_file_explicit", False):
                 ext = os.path.splitext(self.input_file)[1]
@@ -995,7 +995,7 @@ class GeminiSRTTranslator:
         if self.progress_file and os.path.exists(self.progress_file):
             os.remove(self.progress_file)
 
-        if self.srt_extracted and os.path.exists(self.input_file):
+        if self.subtitle_extracted and os.path.exists(self.input_file):
             os.remove(self.input_file)
 
     def _switch_api(self) -> bool:
@@ -1484,7 +1484,7 @@ class GeminiSRTTranslator:
         ltr_count = count["L"] + count["LRE"] + count["LRI"]
         return "rtl" if rtl_count > ltr_count else "ltr"
 
-    def extract(self, type: typing.Literal["audio", "srt"] = "audio"):
+    def extract(self, type: typing.Literal["audio", "subtitle"] = "audio"):
         """
         Extract audio or subtitles from the video file using FFmpeg.
         """
@@ -1504,7 +1504,7 @@ class GeminiSRTTranslator:
             if not self.audio_file:
                 error("Failed to extract audio from the video file.", ignore_quiet=True)
                 exit(1)
-        elif type == "srt":
+        elif type == "subtitle":
             self.input_file = extract_subtitle_from_video(self.video_file)
             if not self.input_file:
                 error(
@@ -1513,7 +1513,7 @@ class GeminiSRTTranslator:
                 )
                 exit(1)
         else:
-            error("Invalid extraction type. Use 'audio' or 'srt'.", ignore_quiet=True)
+            error("Invalid extraction type. Use 'audio' or 'subtitle'.", ignore_quiet=True)
             exit(1)
 
     def transcribe(self):
