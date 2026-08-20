@@ -794,9 +794,9 @@ class GeminiSRTTranslator:
 
         if self.gemini_api_key2:
             if self.use_colors:
-                info(f"Starting with \033[31mAPI Key {self.current_api_number}")
+                info_with_progress(f"Starting with \033[31mAPI Key {self.current_api_number}", isSending=True)
             else:
-                info(f"Starting with API Key {self.current_api_number}")
+                info_with_progress(f"Starting with API Key {self.current_api_number}", isSending=True)
 
         def handle_interrupt(signal_received, frame):
             last_chunk_size = get_last_chunk_size()

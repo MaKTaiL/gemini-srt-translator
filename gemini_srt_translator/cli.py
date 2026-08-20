@@ -107,7 +107,7 @@ def cmd_translate(args) -> None:
         elif not get_key_from_env("GEMINI_API_KEY"):
             gst.gemini_api_key = get_api_key_from_input()
 
-    gst.gemini_api_key2 = args.api_key2
+    gst.gemini_api_key2 = args.api_key2 or get_key_from_env("GEMINI_API_KEY2")
 
     # Validate input file
     if args.input_file:
