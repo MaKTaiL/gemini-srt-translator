@@ -256,6 +256,7 @@ class GeminiSRTTranslator:
                 audio_file=self.audio_file,
                 description=self.description,
             ),
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
             service_tier=self.service_tier if not self.use_enterprise else None,
             thinking_config=(
                 types.ThinkingConfig(
@@ -315,6 +316,7 @@ class GeminiSRTTranslator:
                 thinking_compatible=thinking_compatible,
                 description=self.description,
             ),
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
             service_tier=self.service_tier if not self.use_enterprise else None,
             thinking_config=(
                 types.ThinkingConfig(
