@@ -240,17 +240,17 @@ gst translate \
 #### Transcribing Audio/Video
 
 ```bash
-# Transcribe a video file to SRT
-gst transcribe -v video.mp4 -o transcription.srt
+# Transcribe a video file directly to SRT (outputs video.srt)
+gst transcribe -v video.mp4
 
-# Transcribe an audio file
-gst transcribe -a audio.mp3 -o transcription.srt
+# Transcribe an audio file directly to SRT (outputs audio.srt)
+gst transcribe -a audio.mp3
 
-# Transcribe with custom settings
+# Transcribe with custom output and settings
 gst transcribe \
   -v video.mp4 \
   -o transcription.srt \
-  --model gemini-3.5-flash \
+  --model gemini-3.7-flash \
   --service-tier standard \
   --description "Meeting recording about project X" \
   --thinking-level high \
@@ -454,6 +454,243 @@ import gemini_srt_translator as gst
 
 gst.gemini_api_key = "your_api_key_here"
 gst.listmodels()
+```
+
+---
+
+## 🤖 AI Agent Skill & Custom LLM Pipeline
+
+You can use **Gemini SRT Translator** as an **Agent Skill** (`SKILL.md`) for AI coding agents (**Google Antigravity**, **Claude Code**, **Cursor**, **Cline / Roo-Code**, **OpenAI Codex**) or drive the pipeline step-by-step with any custom LLM without needing a Gemini API key.
+
+The engine handles all deterministic subtitle parsing, audio extraction, timestamp alignment, sliding context window, JSON repair, progress tracking, and atomic file saving.
+
+### 1. Install the Skill for AI Agents (`gst skill install`)
+
+After installing the package via `pip install gemini-srt-translator`, you can install the Subtitle Translator skill with a single command:
+
+```bash
+# Install to current project (.gemini/skills/subtitle-translator/SKILL.md)
+gst skill install
+
+# Install globally for all projects in your user home directory:
+gst skill install --global
+
+# Target specific platforms (antigravity, claude, cursor, agent, or all):
+gst skill install --target claude
+gst skill install --target all
+
+# Print SKILL.md contents to stdout:
+gst skill show
+```
+
+Once installed, simply ask your agent in natural language:
+
+> _"Translate movie.srt to Brazilian Portuguese"_
+
+The agent will automatically use the skill to invoke `gst agent translate` and process the file scene-by-scene!
+
+### 2. Subtitle Translation Suite (`gst agent translate`)
+
+For manual agent orchestration or custom LLM scripts:
+
+```bash
+# 1. Start session and receive Batch #1
+gst agent translate start subtitle.srt -l "French" --batch-size 100
+
+# 2. Commit translated batch (returns next batch)
+gst agent translate commit subtitle.srt --data '[{"index": "0", "text": "Bonjour..."}]'
+# Or pass a file: gst agent translate commit subtitle.srt --data-file batch.json
+
+# 3. Get pending batch, check status, or reset
+gst agent translate next subtitle.srt -l "French"
+gst agent translate status subtitle.srt
+gst agent translate reset subtitle.srt
+```
+
+### 3. Python Programmatic API (`SubtitleSession` & `TranscriptionSession`)
+
+If you are building custom AI workflows, Python scripts, or integrating with alternative LLMs (OpenAI, Claude, Ollama, DeepSeek, Whisper, etc.), you can drive the subtitle processing pipeline directly via `SubtitleSession` and `TranscriptionSession`.
+
+The session engine handles all subtitle parsing, line counting, batching, sliding context window, timestamp math, JSON repair, progress tracking, and atomic file saving.
+
+---
+
+#### A. Subtitle Translation (`SubtitleSession`)
+
+##### 1. Initialization Parameters
+
+```python
+from gemini_srt_translator import SubtitleSession
+
+session = SubtitleSession(
+    input_file="movie.srt",          # Path to .srt, .ass, or video file (.mp4, .mkv)
+    target_language="French",        # Target language string (e.g. "French", "Brazilian Portuguese")
+    output_file="movie_fr.srt",      # (Optional) Custom output path (defaults to <name>_translated.srt/.ass)
+    batch_size=100,                  # (Optional) Subtitle lines per batch (default: 100)
+    resume_context_size=20,          # (Optional) Previous translated lines included for context (default: 20)
+    description="Context notes...",  # (Optional) Background context notes for character tone/series
+    resume=True,                     # (Optional) Auto-resume from existing .progress file (default: True)
+)
+```
+
+##### 2. `session.get_next_batch()` (What you receive)
+
+Returns `None` when completed, or a `dict` payload containing:
+
+```python
+batch_payload = session.get_next_batch()
+
+# Example batch_payload contents:
+# {
+#     "batch_number": 1,
+#     "total_batches": 5,
+#     "start_line": 1,
+#     "end_line": 100,
+#     "total_lines": 500,
+#     "progress_percent": 0.0,
+#     "system_prompt": "You are a professional subtitle translator...",
+#     "batch": [
+#         {"index": "0", "text": "Hello, world!"},
+#         {"index": "1", "text": "How are you today?"},
+#         ...
+#     ],
+#     "context": [
+#         {"index": "-1", "text": "Previous scene dialogue line..."},
+#         ...
+#     ],
+#     "is_complete": False
+# }
+```
+
+##### 3. `session.commit_batch(translated)` (What you send)
+
+Accepts either a **Python `list[dict]`** or a **raw JSON string** (markdown codeblocks are automatically handled by built-in `json_repair`):
+
+```python
+# Pass translated list matching the item count and indices:
+translated_data = [
+    {"index": "0", "text": "Bonjour le monde !"},
+    {"index": "1", "text": "Comment vas-tu aujourd'hui ?"},
+]
+
+# Or pass a raw JSON string:
+# translated_data = '[{"index": "0", "text": "Bonjour le monde !"}, ...]'
+
+result = session.commit_batch(translated_data)
+# result -> {"success": True, "is_complete": False, "status": {...}}
+```
+
+##### Complete Translation Loop Example:
+
+```python
+from gemini_srt_translator import SubtitleSession
+
+session = SubtitleSession("subtitle.srt", target_language="French", batch_size=100)
+
+while not session.is_complete():
+    batch = session.get_next_batch()
+    if not batch:
+        break
+
+    # Send batch["batch"] (and optional batch["context"]) to your model
+    translated = my_custom_llm(batch["batch"])
+
+    # Commit translated items (validates parity and saves atomically to disk)
+    result = session.commit_batch(translated)
+    if not result["success"]:
+        print(f"Error in batch {batch['batch_number']}: {result['error']}")
+        break
+
+print(f"Translation complete! Saved to: {session.output_file}")
+```
+
+---
+
+#### B. Audio & Video Transcription (`TranscriptionSession`)
+
+##### 1. Initialization Parameters
+
+```python
+from gemini_srt_translator import TranscriptionSession
+
+trans_session = TranscriptionSession(
+    audio_file="audio.mp3",          # Path to audio (.mp3, .wav, .m4a) or video file (.mp4, .mkv)
+    output_file="transcript.srt",    # (Optional) Custom output subtitle path (.srt or .ass)
+    audio_chunk_size=600,            # (Optional) Slice duration in seconds (default: 600s / 10 min)
+    isolate_voice=False,             # (Optional) Use Demucs voice isolation if available
+    description="Context notes...",  # (Optional) Notes for transcription context
+    resume=True,                     # (Optional) Auto-resume from existing .progress file
+)
+```
+
+##### 2. `trans_session.get_next_chunk()` (What you receive)
+
+Returns `None` when completed, or a `dict` payload containing:
+
+```python
+chunk_payload = trans_session.get_next_chunk()
+
+# Example chunk_payload contents:
+# {
+#     "chunk_number": 1,
+#     "total_chunks": 3,
+#     "start_seconds": 0,
+#     "end_seconds": 600,
+#     "total_seconds": 1800,
+#     "progress_percent": 0.0,
+#     "audio_bytes": b'...',                   # Raw MP3 bytes of the current slice
+#     "audio_chunk_path": "/tmp/...chunk_1.mp3", # Path to temporary audio slice on disk
+#     "system_prompt": "You are a professional transcriber...",
+#     "is_complete": False
+# }
+```
+
+##### 3. `trans_session.commit_chunk(transcribed)` (What you send)
+
+Accepts either a **Python `list[dict]`** or a **raw JSON string**. Timestamps are relative to the start of the chunk (`00:00` to `MM:SS` or `HH:MM:SS`); `TranscriptionSession` automatically computes and applies the global timestamp offset across the entire file:
+
+```python
+# Pass transcribed dialogue items for the current chunk:
+transcribed_data = [
+    {
+        "text": "This is the first spoken line.",
+        "time_start": "00:02",  # relative to chunk start
+        "time_end": "00:06",
+    },
+    {
+        "text": "And here is the second dialogue line.",
+        "time_start": "00:07",
+        "time_end": "00:11",
+    },
+]
+
+result = trans_session.commit_chunk(transcribed_data)
+# result -> {"success": True, "added_subtitles": 2, "is_complete": False, "status": {...}}
+```
+
+##### Complete Transcription Loop Example:
+
+```python
+from gemini_srt_translator import TranscriptionSession
+
+trans_session = TranscriptionSession(audio_file="podcast.mp3", audio_chunk_size=600)
+
+while not trans_session.is_complete():
+    chunk = trans_session.get_next_chunk()
+    if not chunk:
+        break
+
+    # Transcribe audio using your preferred model (Whisper, Gemini API, etc.)
+    # You can pass chunk["audio_bytes"] or chunk["audio_chunk_path"]
+    transcribed = my_audio_transcriber(chunk["audio_bytes"])
+
+    # Commit chunk (calculates global time offsets and writes to disk atomically)
+    result = trans_session.commit_chunk(transcribed)
+    if not result["success"]:
+        print(f"Error in chunk {chunk['chunk_number']}: {result['error']}")
+        break
+
+print(f"Transcription complete! Saved to: {trans_session.output_file}")
 ```
 
 ---

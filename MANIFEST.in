@@ -1,2 +1,4 @@
 include README.md
 include LICENSE
+recursive-include skills *
+recursive-include gemini_srt_translator *.json *.md
