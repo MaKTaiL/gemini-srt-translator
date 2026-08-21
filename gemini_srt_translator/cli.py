@@ -11,6 +11,7 @@ from typing import Optional
 
 import gemini_srt_translator as gst
 
+from .agent_cli import add_agent_subparser, handle_agent_command
 from .logger import error, info, success
 
 
@@ -352,6 +353,34 @@ def cmd_transcribe(args) -> None:
         sys.exit(1)
 
 
+def cmd_skill(args) -> None:
+    """Handle skill command (install, show, path)."""
+    from .skill import get_skill_content, get_skill_path, install_skill
+
+    action = getattr(args, "skill_action", None) or "install"
+
+    if action == "show":
+        print(get_skill_content())
+        return
+    elif action == "path":
+        print(get_skill_path())
+        return
+    elif action == "install":
+        target = getattr(args, "target", "antigravity") or "antigravity"
+        is_global = bool(getattr(args, "global_install", False))
+        custom_dir = getattr(args, "dir", None)
+        try:
+            paths = install_skill(target=target, is_global=is_global, custom_dir=custom_dir)
+            scope_str = "globally" if is_global else "locally"
+            success(f"Subtitle Translator skill installed {scope_str} for '{target}':")
+            for p in paths:
+                info(f"  ✓ {p}")
+            info("\nYour AI agent can now use the skill to translate subtitles!")
+        except Exception as e:
+            error(f"Failed to install skill: {e}")
+            sys.exit(1)
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Create and configure argument parser."""
     parser = argparse.ArgumentParser(
@@ -552,6 +581,34 @@ Examples:
         "--request-type", choices=["shared", "dedicated"], help="Vertex AI request type ('shared' or 'dedicated')"
     )
 
+    # Agent commands for AI coding agents
+    add_agent_subparser(subparsers)
+
+    # Skill command for installing AI agent skills
+    skill_parser = subparsers.add_parser(
+        "skill", help="Install and manage Subtitle Translator skill for AI coding agents"
+    )
+    skill_subparsers = skill_parser.add_subparsers(dest="skill_action", help="Skill action")
+
+    skill_install = skill_subparsers.add_parser("install", help="Install Subtitle Translator skill")
+    skill_install.add_argument(
+        "-t",
+        "--target",
+        default="antigravity",
+        help="Target platform: antigravity (default), claude, cursor, agent, all",
+    )
+    skill_install.add_argument(
+        "-g",
+        "--global",
+        dest="global_install",
+        action="store_true",
+        help="Install globally in user home directory",
+    )
+    skill_install.add_argument("-d", "--dir", help="Custom target directory for SKILL.md")
+
+    skill_subparsers.add_parser("show", help="Print the SKILL.md contents to stdout")
+    skill_subparsers.add_parser("path", help="Print the packaged SKILL.md path")
+
     return parser
 
 
@@ -565,7 +622,11 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        if args.command == "translate":
+        if args.command == "agent":
+            sys.exit(handle_agent_command(args))
+        elif args.command == "skill":
+            cmd_skill(args)
+        elif args.command == "translate":
             cmd_translate(args)
         elif args.command == "list-models":
             cmd_list_models(args)
