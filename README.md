@@ -731,6 +731,7 @@ If you prefer a user-friendly graphical interface over command-line usage, be su
 
 - **[🔗 Gemini SRT Translator GUI](https://github.com/mkaflowski/Gemini-SRT-translator-GUI) (by @mkaflowski)**
 - **[🔗 Gemini SRT Translator GUI](https://github.com/dane-9/gemini-srt-translator-gui) (by @dane-9)**
+- **[🔗 Gemini SRT Translator GUI](https://github.com/howatduck/GeminiSRTTranslatorGUI) (by @howatduck)**
 
 Perfect for users who want the same powerful translation capabilities with an intuitive visual interface!
 
